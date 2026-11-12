@@ -42,7 +42,9 @@ class KarooLightControl(private val context: Context) {
     private var lightModeParcelableCreator: ((String) -> Parcelable)? = { modeName ->
         io.hammerhead.datamodels.timeseriesData.models.LightMode.fromName(modeName)
     }
-    private var deviceCreator: ((String) -> Parcelable)? = null
+    private var deviceCreator: ((String) -> Parcelable)? = { uid ->
+        io.hammerhead.datamodels.timeseriesData.models.Device(uid)
+    }
     private var isBound = false
     private var bindRequested = false
 
@@ -282,13 +284,9 @@ class KarooLightControl(private val context: Context) {
             val descriptor = binder.interfaceDescriptor ?: LIGHT_CMD_DESCRIPTOR
             data.writeInterfaceToken(descriptor)
             data.writeString(deviceId)
-            val device = deviceCreator?.invoke(deviceId)
-            if (device != null) {
-                data.writeInt(1)
-                device.writeToParcel(data, 0)
-            } else {
-                data.writeInt(0)
-            }
+            val device = deviceCreator?.invoke(deviceId) ?: io.hammerhead.datamodels.timeseriesData.models.Device(deviceId)
+            data.writeInt(1)
+            device.writeToParcel(data, 0)
             val bundle = Bundle()
             bundle.classLoader = lightMode.javaClass.classLoader
             bundle.putParcelable("value", lightMode)
@@ -313,12 +311,11 @@ class KarooLightControl(private val context: Context) {
 
     fun registerConnectionState(deviceId: String) {
         val binder = sensorBinder
-        val creator = deviceCreator
-        if (binder == null || creator == null) {
+        if (binder == null) {
             pendingRegistrations.add(deviceId)
             return
         }
-        val device = creator(deviceId)
+        val device = deviceCreator?.invoke(deviceId) ?: io.hammerhead.datamodels.timeseriesData.models.Device(deviceId)
         val listenerId = "light-conn-$deviceId"
         if (listenerId in registeredListeners) return
 
@@ -384,12 +381,11 @@ class KarooLightControl(private val context: Context) {
 
     fun registerForLightParameters(deviceId: String) {
         val binder = lightCmdBinder
-        val creator = deviceCreator
-        if (binder == null || creator == null) {
+        if (binder == null) {
             pendingLightParamRegistrations.add(deviceId)
             return
         }
-        val device = creator(deviceId)
+        val device = deviceCreator?.invoke(deviceId) ?: io.hammerhead.datamodels.timeseriesData.models.Device(deviceId)
         val listenerId = "light-params-$deviceId"
         if (listenerId in registeredListeners) return
 
