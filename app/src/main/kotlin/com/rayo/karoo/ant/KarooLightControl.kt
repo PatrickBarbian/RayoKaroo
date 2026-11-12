@@ -39,7 +39,9 @@ class KarooLightControl(private val context: Context) {
 
     private var sensorBinder: IBinder? = null
     private var lightCmdBinder: IBinder? = null
-    private var lightModeParcelableCreator: ((String) -> Parcelable)? = null
+    private var lightModeParcelableCreator: ((String) -> Parcelable)? = { modeName ->
+        io.hammerhead.datamodels.timeseriesData.models.LightMode.fromName(modeName)
+    }
     private var deviceCreator: ((String) -> Parcelable)? = null
     private var isBound = false
     private var bindRequested = false
@@ -131,60 +133,66 @@ class KarooLightControl(private val context: Context) {
     }
 
     private fun loadLightModeClass() {
+        if (lightModeParcelableCreator == null) {
+            lightModeParcelableCreator = { modeName ->
+                io.hammerhead.datamodels.timeseriesData.models.LightMode.fromName(modeName)
+            }
+        }
+
         try {
-            val classLoader = try {
-                val sensorCtx = context.createPackageContext(
+            val sensorCtx = try {
+                context.createPackageContext(
                     "io.hammerhead.sensorservice",
                     Context.CONTEXT_INCLUDE_CODE or Context.CONTEXT_IGNORE_SECURITY
                 )
-                sensorCtx.classLoader
             } catch (e: Exception) {
-                Log.w(TAG, "createPackageContext failed, loading via PathClassLoader fallback: ${e.message}")
-                dalvik.system.PathClassLoader(
-                    "/system/priv-app/hxsensorservice/hxsensorservice.apk",
-                    context.classLoader
+                null
+            }
+
+            if (sensorCtx != null) {
+                val classLoader = sensorCtx.classLoader
+                val cls = classLoader.loadClass(
+                    "io.hammerhead.datamodels.timeseriesData.models.LightMode"
                 )
-            }
+                @Suppress("UNCHECKED_CAST")
+                val enumClass = cls as Class<out Enum<*>>
+                Log.d(TAG, "Loaded LightMode class from system: ${cls.name}")
+                Log.d(TAG, "Available Karoo LightModes: " + cls.enumConstants?.joinToString())
 
-            val cls = classLoader.loadClass(
-                "io.hammerhead.datamodels.timeseriesData.models.LightMode"
-            )
-            @Suppress("UNCHECKED_CAST")
-            val enumClass = cls as Class<out Enum<*>>
-            Log.d(TAG, "Loaded LightMode class: ${cls.name}")
-            Log.d(TAG, "Available Karoo LightModes: " + cls.enumConstants?.joinToString())
-
-            lightModeParcelableCreator = { modeName ->
-                java.lang.Enum.valueOf(enumClass, modeName) as Parcelable
-            }
-
-            val deviceClass = classLoader.loadClass(
-                "io.hammerhead.datamodels.timeseriesData.models.Device"
-            )
-            val defaultMarkerClass = classLoader.loadClass(
-                "kotlin.jvm.internal.DefaultConstructorMarker"
-            )
-            val deviceConstructor = deviceClass.constructors.find { c ->
-                (c.parameterTypes.lastOrNull() == defaultMarkerClass) &&
-                        (c.parameterTypes[c.parameterTypes.size - 2] == Int::class.javaPrimitiveType)
-            }
-            if (deviceConstructor != null) {
-                val deviceInfoConstructor = classLoader.loadClass(
-                    "io.hammerhead.datamodels.timeseriesData.models.DeviceInfo"
-                ).getDeclaredConstructor()
-
-                deviceCreator = { uid ->
-                    val deviceInfo = deviceInfoConstructor.newInstance()
-                    val params = arrayOfNulls<Any>(deviceConstructor.parameterTypes.size)
-                    params[0] = uid
-                    params[1] = deviceInfo
-                    params[4] = false
-                    params[5] = true
-                    params[params.size - 2] = 0x1FFFC
-                    params[params.size - 1] = null
-                    deviceConstructor.newInstance(*params) as Parcelable
+                lightModeParcelableCreator = { modeName ->
+                    java.lang.Enum.valueOf(enumClass, modeName) as Parcelable
                 }
-                Log.d(TAG, "Successfully created Karoo Device reflection creator")
+
+                val deviceClass = classLoader.loadClass(
+                    "io.hammerhead.datamodels.timeseriesData.models.Device"
+                )
+                val defaultMarkerClass = classLoader.loadClass(
+                    "kotlin.jvm.internal.DefaultConstructorMarker"
+                )
+                val deviceConstructor = deviceClass.constructors.find { c ->
+                    (c.parameterTypes.lastOrNull() == defaultMarkerClass) &&
+                            (c.parameterTypes[c.parameterTypes.size - 2] == Int::class.javaPrimitiveType)
+                }
+                if (deviceConstructor != null) {
+                    val deviceInfoConstructor = classLoader.loadClass(
+                        "io.hammerhead.datamodels.timeseriesData.models.DeviceInfo"
+                    ).getDeclaredConstructor()
+
+                    deviceCreator = { uid ->
+                        val deviceInfo = deviceInfoConstructor.newInstance()
+                        val params = arrayOfNulls<Any>(deviceConstructor.parameterTypes.size)
+                        params[0] = uid
+                        params[1] = deviceInfo
+                        params[4] = false
+                        params[5] = true
+                        params[params.size - 2] = 0x1FFFC
+                        params[params.size - 1] = null
+                        deviceConstructor.newInstance(*params) as Parcelable
+                    }
+                    Log.d(TAG, "Successfully created Karoo Device reflection creator")
+                }
+            } else {
+                Log.i(TAG, "Using built-in AIDL LightMode parcelable mirror (cross-process reflection restricted)")
             }
 
             pendingRegistrations.toList().forEach { registerConnectionState(it) }
@@ -193,7 +201,7 @@ class KarooLightControl(private val context: Context) {
             pendingLightParamRegistrations.clear()
             onStateChanged?.invoke()
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to load Karoo LightMode class via reflection", e)
+            Log.w(TAG, "Dynamic class loading notice: ${e.message}; using built-in LightMode mirror")
         }
     }
 
@@ -289,6 +297,7 @@ class KarooLightControl(private val context: Context) {
 
             binder.transact(TX_SET_LIGHT_MODE, data, reply, 0)
             reply.readException()
+            Log.d(TAG, "executeSetLightMode($deviceId, $modeName) succeeded!")
             lastCommandedMode[deviceId] = modeName
             _actualModes.update { it + (deviceId to modeName) }
             onStateChanged?.invoke()

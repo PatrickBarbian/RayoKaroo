@@ -12,3 +12,6 @@
 # APK binaries (upload to GitHub Releases)
 *.apk
 *.aab
+*.zip
+debug/
+hxsensorservice.apk
