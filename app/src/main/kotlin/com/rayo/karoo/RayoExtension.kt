@@ -64,6 +64,8 @@ class RayoExtension : KarooExtension("rayo", "1.0.0") {
 
         // ANT+ / Lezyne settings
         const val PREF_ANT_DEFAULT_MODE = "ant_default_mode"
+        const val PREF_STVO_MODE = "stvo_mode_enabled"
+        const val PREF_STVO_WARN_FLASH = "stvo_warn_flash_enabled"
         const val PREF_RADAR_THREAT = "radar_threat_enabled"
         const val PREF_RADAR_THREAT_YELLOW = "radar_threat_yellow"
         const val PREF_RADAR_THREAT_RED = "radar_threat_red"
@@ -147,6 +149,23 @@ class RayoExtension : KarooExtension("rayo", "1.0.0") {
     private var threatHoldJob: Job? = null
     private var brakeHoldJob: Job? = null
     private var radarSimulatorJob: Job? = null
+    private var stvoFlashJob: Job? = null
+
+    var onSimulationStep: ((threatLevel: Int, label: String) -> Unit)? = null
+
+    fun isStvoModeActive(): Boolean {
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        if (prefs.contains(PREF_STVO_MODE)) {
+            return prefs.getBoolean(PREF_STVO_MODE, true)
+        }
+        val light = primaryAntLight ?: return true
+        val supported = karooLightControl.supportedModes.value[light.id]
+        if (!supported.isNullOrEmpty()) {
+            val hasFlash = supported.any { it.contains("FLASH", ignoreCase = true) }
+            return !hasFlash
+        }
+        return true
+    }
 
     private var radarConsumerId: String? = null
     private var speedConsumerId: String? = null
@@ -323,10 +342,10 @@ class RayoExtension : KarooExtension("rayo", "1.0.0") {
             }.toMap()
 
             val lights = savedDevices.devices.filter { device ->
-                device.supportedDataTypes.contains(BIKE_LIGHT_DATA_TYPE) && device.enabled
-            }.filter { device ->
                 val parts = device.id.split("-")
-                parts.size >= 3 && parts[1].toIntOrNull() == DEVICE_TYPE_BIKE_LIGHT
+                val isLightType = parts.size >= 2 && parts[1].toIntOrNull() == DEVICE_TYPE_BIKE_LIGHT
+                val hasLightDataType = device.supportedDataTypes.any { it.contains("Light", ignoreCase = true) }
+                device.enabled && (isLightType || hasLightDataType)
             }
 
             synchronized(discoveredAntLights) {
@@ -494,7 +513,10 @@ class RayoExtension : KarooExtension("rayo", "1.0.0") {
     fun onRadarThreatLevel(threatLevel: Int) {
         val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val threatReactionEnabled = prefs.getBoolean(PREF_RADAR_THREAT, true)
+        val stvoWarnFlashEnabled = prefs.getBoolean(PREF_STVO_WARN_FLASH, true)
+        val oldThreat = currentThreatLevel
         currentThreatLevel = threatLevel
+        val isGerman = Locale.getDefault().language.startsWith("de")
 
         if (threatLevel > 0) {
             threatHoldJob?.cancel()
@@ -508,8 +530,27 @@ class RayoExtension : KarooExtension("rayo", "1.0.0") {
                     val currentKarooMode = karooLightControl.actualModes.value[primary.id]
                     preThreatMode = LightMode.fromKarooName(currentKarooMode)
                 }
+            }
 
-                if (threatReactionEnabled) {
+            // In-Ride Notification Popup on screen
+            if (oldThreat != threatLevel) {
+                if (threatLevel >= 2) {
+                    showInRideAlert(
+                        if (isGerman) "🚨 Schnelles Fahrzeug!" else "🚨 Fast Vehicle!",
+                        if (isGerman) "Radar-Alarm (Rot)" else "Radar Alert (Red)"
+                    )
+                } else {
+                    showInRideAlert(
+                        if (isGerman) "🚗 Fahrzeug nähert sich!" else "🚗 Vehicle Approaching!",
+                        if (isGerman) "Radar-Warnung (Gelb)" else "Radar Warning (Yellow)"
+                    )
+                }
+            }
+
+            if (threatReactionEnabled) {
+                if (isStvoModeActive() || stvoWarnFlashEnabled) {
+                    triggerStvoWarningFlash(threatLevel)
+                } else {
                     val threatModeName = if (threatLevel >= 2) {
                         prefs.getString(PREF_RADAR_THREAT_RED, LightMode.FAST_FLASH.karooName)
                             ?: LightMode.FAST_FLASH.karooName
@@ -519,9 +560,12 @@ class RayoExtension : KarooExtension("rayo", "1.0.0") {
                     }
                     setAntLightsMode(threatModeName)
                 }
-                updateAllAntDataFields()
             }
+            updateAllAntDataFields()
         } else {
+            stvoFlashJob?.cancel()
+            stvoFlashJob = null
+
             if (!isRadarThreatActive && threatHoldJob == null) return
             if (!isRadarThreatActive) return
 
@@ -542,34 +586,71 @@ class RayoExtension : KarooExtension("rayo", "1.0.0") {
         }
     }
 
+    private fun triggerStvoWarningFlash(threatLevel: Int) {
+        val light = primaryAntLight ?: return
+        val highModeName = karooLightControl.getEffectiveHighMode(light.id)
+        val lowModeName = "OFF" // Pulsing High <-> OFF produces an unmistakable warning flash!
+
+        stvoFlashJob?.cancel()
+        stvoFlashJob = scope.launch {
+            val pulses = if (threatLevel >= 2) 6 else 4
+            val delayMs = if (threatLevel >= 2) 280L else 350L
+
+            for (i in 1..pulses) {
+                if (!isActive || !isRadarThreatActive) break
+                karooLightControl.setMode(light.id, highModeName)
+                delay(delayMs)
+                if (!isActive || !isRadarThreatActive) break
+                karooLightControl.setMode(light.id, lowModeName)
+                delay(delayMs)
+            }
+
+            // Once warning pulse finishes, keep light ON High if car is still present
+            if (isRadarThreatActive) {
+                karooLightControl.setMode(light.id, highModeName)
+            } else {
+                restoreNormalAntMode()
+            }
+        }
+    }
+
     // --- RADAR SIMULATOR (INDOOR TESTING) ---
 
     fun startRadarSimulation() {
         if (radarSimulatorJob != null) return
+        val isGerman = Locale.getDefault().language.startsWith("de")
+        showInRideAlert("🧪 Radar-Simulator", if (isGerman) "Testlauf gestartet" else "Test simulation started")
+
         radarSimulatorJob = scope.launch {
             while (isActive) {
+                onSimulationStep?.invoke(0, if (isGerman) "✅ Straße frei (Normal)" else "✅ Road Clear")
                 onRadarThreatLevel(0)
-                delay(8000L)
+                delay(6000L)
                 if (!isActive) break
 
+                onSimulationStep?.invoke(1, if (isGerman) "🚗 Annäherung: Warnblinken (Gelb)" else "🚗 Vehicle Warning (Yellow)")
                 onRadarThreatLevel(1)
-                delay(10000L)
+                delay(7000L)
                 if (!isActive) break
 
+                onSimulationStep?.invoke(2, if (isGerman) "🚨 Schnelles Fahrzeug: Schneller Puls (Rot)" else "🚨 Fast Vehicle Alert (Red)")
                 onRadarThreatLevel(2)
                 delay(6000L)
                 if (!isActive) break
 
+                onSimulationStep?.invoke(0, if (isGerman) "✅ Fahrzeug überholt: Normalbetrieb" else "✅ Vehicle Passed")
                 onRadarThreatLevel(0)
-                delay(1200L)
+                delay(5000L)
                 if (!isActive) break
 
+                onSimulationStep?.invoke(2, if (isGerman) "🚨 Schnelles Fahrzeug (Rot)" else "🚨 Fast Vehicle (Red)")
                 onRadarThreatLevel(2)
-                delay(8000L)
+                delay(7000L)
                 if (!isActive) break
 
+                onSimulationStep?.invoke(0, if (isGerman) "✅ Straße frei" else "✅ Road Clear")
                 onRadarThreatLevel(0)
-                delay(10000L)
+                delay(8000L)
             }
         }
     }
@@ -578,6 +659,9 @@ class RayoExtension : KarooExtension("rayo", "1.0.0") {
         radarSimulatorJob?.cancel()
         radarSimulatorJob = null
         onRadarThreatLevel(0)
+        val isGerman = Locale.getDefault().language.startsWith("de")
+        onSimulationStep?.invoke(0, if (isGerman) "Simulator beendet." else "Simulator stopped.")
+        showInRideAlert("🧪 Radar-Simulator", if (isGerman) "Testlauf beendet" else "Test simulation stopped")
     }
 
     // --- HELPER: SET & RESTORE MODES ---
@@ -592,9 +676,12 @@ class RayoExtension : KarooExtension("rayo", "1.0.0") {
 
     private fun restoreNormalAntMode() {
         val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val primary = primaryAntLight
         val targetMode = if (isSpeedAdaptiveActive) {
             prefs.getString(PREF_SPEED_MODE, LightMode.STEADY_HIGH.karooName)
                 ?: LightMode.STEADY_HIGH.karooName
+        } else if (isStvoModeActive() && primary != null) {
+            preThreatMode?.karooName ?: karooLightControl.getEffectiveHighMode(primary.id)
         } else {
             preThreatMode?.karooName
                 ?: prefs.getString(PREF_ANT_DEFAULT_MODE, LightMode.DAY_FLASH.karooName)
@@ -666,42 +753,86 @@ class RayoExtension : KarooExtension("rayo", "1.0.0") {
         val light = primaryAntLight ?: return
         val currentKarooMode = karooLightControl.actualModes.value[light.id]
         val currentMode = LightMode.fromKarooName(currentKarooMode)
+        val isGerman = Locale.getDefault().language.startsWith("de")
 
-        val cycleList = LightMode.CYCLE_MODES
-        val currentIndex = cycleList.indexOf(currentMode)
-        val nextMode = if (currentIndex == -1 || currentIndex >= cycleList.size - 1) {
-            cycleList.first()
+        val targetMode: LightMode
+        val targetModeName: String
+
+        if (isStvoModeActive()) {
+            val highModeName = karooLightControl.getEffectiveHighMode(light.id)
+            val lowModeName = karooLightControl.getEffectiveLowMode(light.id)
+
+            if (currentKarooMode == highModeName || currentMode == LightMode.STEADY_HIGH) {
+                targetModeName = lowModeName
+                targetMode = LightMode.STEADY_LOW
+            } else {
+                targetModeName = highModeName
+                targetMode = LightMode.STEADY_HIGH
+            }
         } else {
-            cycleList[currentIndex + 1]
+            val supportedSet = karooLightControl.supportedModes.value[light.id]
+            val cycleList: List<LightMode> = if (!supportedSet.isNullOrEmpty()) {
+                val list = supportedSet.map { LightMode.fromKarooName(it) }.filter { it != LightMode.OFF }.distinct()
+                if (list.size > 1) list else LightMode.CYCLE_MODES
+            } else {
+                LightMode.CYCLE_MODES
+            }
+            val currentIndex = cycleList.indexOf(currentMode)
+            targetMode = if (currentIndex == -1 || currentIndex >= cycleList.size - 1) {
+                cycleList.first()
+            } else {
+                cycleList[currentIndex + 1]
+            }
+            targetModeName = targetMode.karooName
         }
 
-        preThreatMode = nextMode
-        karooLightControl.setMode(light.id, nextMode.karooName)
+        preThreatMode = targetMode
+        karooLightControl.setMode(light.id, targetModeName)
         updateAllAntDataFields()
 
-        val isGerman = Locale.getDefault().language.startsWith("de")
-        showInRideAlert("Lezyne: ${nextMode.getLocalizedName(isGerman)}", "Modus gewechselt")
+        val lightDisplayName = if (isStvoModeActive()) {
+            if (targetMode == LightMode.STEADY_HIGH) (if (isGerman) "Dauerlicht Hell" else "Steady High")
+            else (if (isGerman) "Dauerlicht Spar" else "Steady Low")
+        } else {
+            targetMode.getLocalizedName(isGerman)
+        }
+        showInRideAlert("Radar: $lightDisplayName", if (isGerman) "Modus gewechselt" else "Mode switched")
     }
 
     fun toggleAntLight() {
         val light = primaryAntLight ?: return
         val currentKarooMode = karooLightControl.actualModes.value[light.id]
         val currentMode = LightMode.fromKarooName(currentKarooMode)
-
-        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val isGerman = Locale.getDefault().language.startsWith("de")
 
-        val targetMode = if (currentMode == LightMode.OFF) {
-            val defName = prefs.getString(PREF_ANT_DEFAULT_MODE, LightMode.DAY_FLASH.karooName)
-            LightMode.fromKarooName(defName)
+        val targetMode: LightMode
+        val targetModeName: String
+
+        if (currentMode == LightMode.OFF || currentKarooMode == "OFF") {
+            if (isStvoModeActive()) {
+                targetModeName = karooLightControl.getEffectiveHighMode(light.id)
+                targetMode = LightMode.STEADY_HIGH
+            } else {
+                val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                val defName = prefs.getString(PREF_ANT_DEFAULT_MODE, LightMode.DAY_FLASH.karooName)
+                targetMode = LightMode.fromKarooName(defName)
+                targetModeName = targetMode.karooName
+            }
         } else {
             preThreatMode = currentMode
-            LightMode.OFF
+            targetMode = LightMode.OFF
+            targetModeName = "OFF"
         }
 
-        karooLightControl.setMode(light.id, targetMode.karooName)
+        karooLightControl.setMode(light.id, targetModeName)
         updateAllAntDataFields()
-        showInRideAlert("Lezyne: ${targetMode.getLocalizedName(isGerman)}", if (targetMode == LightMode.OFF) "Ausgeschaltet" else "Eingeschaltet")
+        val lightDisplayName = if (isStvoModeActive() && targetMode != LightMode.OFF) {
+            if (targetMode == LightMode.STEADY_HIGH) (if (isGerman) "Dauerlicht Hell" else "Steady High")
+            else (if (isGerman) "Dauerlicht Spar" else "Steady Low")
+        } else {
+            targetMode.getLocalizedName(isGerman)
+        }
+        showInRideAlert("Radar: $lightDisplayName", if (targetMode == LightMode.OFF) (if (isGerman) "Ausgeschaltet" else "Turned Off") else (if (isGerman) "Eingeschaltet" else "Turned On"))
     }
 
     // --- RAYO BLE IN-RIDE ACTIONS ---
@@ -975,7 +1106,17 @@ class RayoExtension : KarooExtension("rayo", "1.0.0") {
         } else {
             val currentKarooMode = karooLightControl.actualModes.value[light.id]
             val modeEnum = LightMode.fromKarooName(currentKarooMode)
-            val modeLabel = modeEnum.getLocalizedName(isGerman).uppercase()
+            val modeLabel = if (isStvoModeActive()) {
+                if (currentKarooMode == "OFF" || modeEnum == LightMode.OFF) {
+                    if (isGerman) "AUS" else "OFF"
+                } else if (currentKarooMode == karooLightControl.getEffectiveLowMode(light.id) || modeEnum == LightMode.STEADY_LOW) {
+                    if (isGerman) "DAUERLICHT SPAR" else "STEADY LOW"
+                } else {
+                    if (isGerman) "DAUERLICHT HELL" else "STEADY HIGH"
+                }
+            } else {
+                modeEnum.getLocalizedName(isGerman).uppercase()
+            }
 
             rv.setTextViewText(R.id.btnAntCycleMode, modeLabel)
 

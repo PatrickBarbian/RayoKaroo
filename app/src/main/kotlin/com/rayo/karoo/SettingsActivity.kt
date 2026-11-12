@@ -31,11 +31,13 @@ class SettingsActivity : AppCompatActivity() {
 
     // 2. ANT+ / Lezyne Views
     private lateinit var tvAntDeviceStatus: TextView
+    private lateinit var swStvoMode: Switch
     private lateinit var spnAntDefaultMode: Spinner
     private lateinit var btnTestAntToggle: Button
 
     // 3. Radar Threat Views
     private lateinit var swRadarThreat: Switch
+    private lateinit var swStvoWarnFlash: Switch
     private lateinit var spnRadarYellowMode: Spinner
     private lateinit var spnRadarRedMode: Spinner
     private lateinit var spnRadarHoldSec: Spinner
@@ -146,10 +148,12 @@ class SettingsActivity : AppCompatActivity() {
         btnTestToggle = findViewById(R.id.btnTestToggle)
 
         tvAntDeviceStatus = findViewById(R.id.tvAntDeviceStatus)
+        swStvoMode = findViewById(R.id.swStvoMode)
         spnAntDefaultMode = findViewById(R.id.spnAntDefaultMode)
         btnTestAntToggle = findViewById(R.id.btnTestAntToggle)
 
         swRadarThreat = findViewById(R.id.swRadarThreat)
+        swStvoWarnFlash = findViewById(R.id.swStvoWarnFlash)
         spnRadarYellowMode = findViewById(R.id.spnRadarYellowMode)
         spnRadarRedMode = findViewById(R.id.spnRadarRedMode)
         spnRadarHoldSec = findViewById(R.id.spnRadarHoldSec)
@@ -186,6 +190,13 @@ class SettingsActivity : AppCompatActivity() {
             }
         }
 
+        // ANT+ StVO Mode Switch
+        swStvoMode.isChecked = RayoExtension.instance?.isStvoModeActive() ?: prefs.getBoolean(RayoExtension.PREF_STVO_MODE, false)
+        swStvoMode.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit().putBoolean(RayoExtension.PREF_STVO_MODE, isChecked).apply()
+            updateAntStatus()
+        }
+
         // ANT+ Primary Ride Mode
         spnAntDefaultMode.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, antModeLabels)
         val savedAntMode = prefs.getString(RayoExtension.PREF_ANT_DEFAULT_MODE, LightMode.DAY_FLASH.karooName)
@@ -218,6 +229,12 @@ class SettingsActivity : AppCompatActivity() {
         spnRadarHoldSec.setSelection(holdSecOptions.indexOf(savedHold).coerceAtLeast(0))
         spnRadarHoldSec.onItemSelectedListener = simpleSelectListener { pos ->
             prefs.edit().putInt(RayoExtension.PREF_RADAR_HOLD_SEC, holdSecOptions[pos]).apply()
+        }
+
+        // StVO Warning Flash Switch
+        swStvoWarnFlash.isChecked = prefs.getBoolean(RayoExtension.PREF_STVO_WARN_FLASH, true)
+        swStvoWarnFlash.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit().putBoolean(RayoExtension.PREF_STVO_WARN_FLASH, isChecked).apply()
         }
 
         // Radar Simulator Switch
@@ -356,11 +373,24 @@ class SettingsActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            ext.toggleAntLight()
-            val currentKarooMode = ext.karooLightControl.actualModes.value[primary.id]
-            val modeEnum = LightMode.fromKarooName(currentKarooMode)
-            tvSettingsLog.text = "Lezyne: ${modeEnum.getLocalizedName(isGerman)}"
+            if (ext.isStvoModeActive()) {
+                val currentKarooMode = ext.karooLightControl.actualModes.value[primary.id] ?: ""
+                if (currentKarooMode.equals("OFF", ignoreCase = true) || currentKarooMode.isEmpty()) {
+                    ext.toggleAntLight()
+                } else {
+                    ext.cycleAntMode()
+                }
+            } else {
+                ext.toggleAntLight()
+            }
             updateAntStatus()
+        }
+
+        btnTestAntToggle.setOnLongClickListener {
+            val ext = RayoExtension.instance ?: return@setOnLongClickListener false
+            ext.toggleAntLight()
+            updateAntStatus()
+            true
         }
     }
 
@@ -374,6 +404,13 @@ class SettingsActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         RayoExtension.instance?.bleManager?.addListener(bleListener)
+
+        RayoExtension.instance?.onSimulationStep = { threatLevel, label ->
+            runOnUiThread {
+                tvSettingsLog.text = label
+                updateAntStatus()
+            }
+        }
 
         val bm = RayoExtension.instance?.bleManager
         if (bm != null && bm.isConnected) {
@@ -404,14 +441,35 @@ class SettingsActivity : AppCompatActivity() {
             val currentKarooMode = ext.karooLightControl.actualModes.value[primary.id]
             val modeEnum = LightMode.fromKarooName(currentKarooMode)
             val batStr = if (primary.batteryPercent != null) " (${primary.batteryPercent}%)" else ""
+            val isStvo = ext.isStvoModeActive()
 
-            tvAntDeviceStatus.text = "Erkannt: ${primary.name}$batStr\nModus: ${modeEnum.getLocalizedName(isGerman)}"
-            tvAntDeviceStatus.setTextColor(0xFF00E676.toInt())
+            if (isStvo) {
+                val highMode = ext.karooLightControl.getEffectiveHighMode(primary.id)
+                val isHigh = currentKarooMode?.equals(highMode, ignoreCase = true) == true
+                val isOff = currentKarooMode.isNullOrEmpty() || currentKarooMode.equals("OFF", ignoreCase = true)
+                val modeDesc = when {
+                    isOff -> if (isGerman) "Aus" else "Off"
+                    isHigh -> if (isGerman) "Dauerlicht Hell" else "Steady High"
+                    else -> if (isGerman) "Dauerlicht Spar" else "Steady Low"
+                }
 
-            if (modeEnum == LightMode.OFF) {
-                btnTestAntToggle.text = if (isGerman) "Lezyne einschalten" else "Turn Lezyne On"
+                tvAntDeviceStatus.text = "Erkannt: ${primary.name}$batStr [StVZO]\nModus: $modeDesc"
+                tvAntDeviceStatus.setTextColor(0xFF00E676.toInt())
+
+                btnTestAntToggle.text = if (isOff) {
+                    if (isGerman) "Lezyne einschalten (Hell)" else "Turn Lezyne On (High)"
+                } else {
+                    if (isGerman) "Umschalten: ${if (isHigh) "Sparmodus" else "Hell"} (Lange drücken: Aus)" else "Toggle: ${if (isHigh) "Low" else "High"} (Hold: Off)"
+                }
             } else {
-                btnTestAntToggle.text = if (isGerman) "Lezyne ausschalten" else "Turn Lezyne Off"
+                tvAntDeviceStatus.text = "Erkannt: ${primary.name}$batStr\nModus: ${modeEnum.getLocalizedName(isGerman)}"
+                tvAntDeviceStatus.setTextColor(0xFF00E676.toInt())
+
+                if (modeEnum == LightMode.OFF) {
+                    btnTestAntToggle.text = if (isGerman) "Lezyne einschalten" else "Turn Lezyne On"
+                } else {
+                    btnTestAntToggle.text = if (isGerman) "Lezyne ausschalten" else "Turn Lezyne Off"
+                }
             }
         } else {
             tvAntDeviceStatus.text = getString(R.string.no_ant_lights)
@@ -423,6 +481,7 @@ class SettingsActivity : AppCompatActivity() {
     override fun onPause() {
         super.onPause()
         RayoExtension.instance?.bleManager?.removeListener(bleListener)
+        RayoExtension.instance?.onSimulationStep = null
     }
 
     private fun updateTestButtonText(isLightOn: Boolean) {
@@ -448,6 +507,8 @@ class SettingsActivity : AppCompatActivity() {
             tvPairedStatus.setTextColor(0xFFFFFFFF.toInt())
         }
 
+        swStvoMode.isChecked = RayoExtension.instance?.isStvoModeActive() ?: prefs.getBoolean(RayoExtension.PREF_STVO_MODE, false)
+        swStvoWarnFlash.isChecked = prefs.getBoolean(RayoExtension.PREF_STVO_WARN_FLASH, true)
         swRadarThreat.isChecked = prefs.getBoolean(RayoExtension.PREF_RADAR_THREAT, true)
         swBrakeEnabled.isChecked = prefs.getBoolean(RayoExtension.PREF_BRAKE_ENABLED, true)
         swSpeedAdaptive.isChecked = prefs.getBoolean(RayoExtension.PREF_SPEED_ADAPTIVE_ENABLED, false)

@@ -39,6 +39,10 @@
     <string name="no_ant_lights">Kein ANT+ Licht gefunden. Bitte Lezyne zuerst in den Karoo-Sensoren koppeln!</string>
     <string name="ant_default_mode_title">Primärer Fahrmodus</string>
     <string name="test_ant_toggle">Lezyne-Schalter testen</string>
+    <string name="stvo_mode_title">StVZO-Modus (Hell / Spar)</string>
+    <string name="stvo_mode_desc">Für StVZO-zugelassene Lichter (z. B. Lezyne StVZO). Schaltet sauber zwischen Dauerlicht Hell und Spar um; verhindert inkompatible Blinkmodi.</string>
+    <string name="stvo_warn_flash_title">StVZO-Warnblinken (Software-Pulsieren)</string>
+    <string name="stvo_warn_flash_desc">Lässt auch StVZO-Dauerlichter bei Annäherung per Software-Taktung schnell aufblitzen.</string>
 
     <!-- Radar Threat Settings -->
     <string name="radar_threat_title">Radar-Reaktion (Warnblinken)</string>

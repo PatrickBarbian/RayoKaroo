@@ -39,6 +39,10 @@
     <string name="no_ant_lights">No ANT+ lights found. Pair your Lezyne in Karoo Sensors first!</string>
     <string name="ant_default_mode_title">Primary Ride Mode</string>
     <string name="test_ant_toggle">Test Lezyne Toggle</string>
+    <string name="stvo_mode_title">German StVZO Mode (High / Low)</string>
+    <string name="stvo_mode_desc">For StVZO-certified lights (e.g. Lezyne StVZO). Toggles only between High and Low steady modes; disables non-supported flash modes.</string>
+    <string name="stvo_warn_flash_title">StVZO Threat Warning Pulse</string>
+    <string name="stvo_warn_flash_desc">Quickly pulses steady lights on/off via ANT+ when vehicles approach from behind.</string>
 
     <!-- Radar Threat Settings -->
     <string name="radar_threat_title">Radar Threat Warning</string>

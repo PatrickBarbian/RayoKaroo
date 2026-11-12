@@ -132,23 +132,36 @@ class KarooLightControl(private val context: Context) {
 
     private fun loadLightModeClass() {
         try {
-            val sensorCtx = context.createPackageContext(
-                "io.hammerhead.sensorservice",
-                Context.CONTEXT_INCLUDE_CODE or Context.CONTEXT_IGNORE_SECURITY
-            )
-            val cls = sensorCtx.classLoader.loadClass(
+            val classLoader = try {
+                val sensorCtx = context.createPackageContext(
+                    "io.hammerhead.sensorservice",
+                    Context.CONTEXT_INCLUDE_CODE or Context.CONTEXT_IGNORE_SECURITY
+                )
+                sensorCtx.classLoader
+            } catch (e: Exception) {
+                Log.w(TAG, "createPackageContext failed, loading via PathClassLoader fallback: ${e.message}")
+                dalvik.system.PathClassLoader(
+                    "/system/priv-app/hxsensorservice/hxsensorservice.apk",
+                    context.classLoader
+                )
+            }
+
+            val cls = classLoader.loadClass(
                 "io.hammerhead.datamodels.timeseriesData.models.LightMode"
             )
             @Suppress("UNCHECKED_CAST")
             val enumClass = cls as Class<out Enum<*>>
+            Log.d(TAG, "Loaded LightMode class: ${cls.name}")
+            Log.d(TAG, "Available Karoo LightModes: " + cls.enumConstants?.joinToString())
+
             lightModeParcelableCreator = { modeName ->
                 java.lang.Enum.valueOf(enumClass, modeName) as Parcelable
             }
 
-            val deviceClass = sensorCtx.classLoader.loadClass(
+            val deviceClass = classLoader.loadClass(
                 "io.hammerhead.datamodels.timeseriesData.models.Device"
             )
-            val defaultMarkerClass = sensorCtx.classLoader.loadClass(
+            val defaultMarkerClass = classLoader.loadClass(
                 "kotlin.jvm.internal.DefaultConstructorMarker"
             )
             val deviceConstructor = deviceClass.constructors.find { c ->
@@ -156,7 +169,7 @@ class KarooLightControl(private val context: Context) {
                         (c.parameterTypes[c.parameterTypes.size - 2] == Int::class.javaPrimitiveType)
             }
             if (deviceConstructor != null) {
-                val deviceInfoConstructor = sensorCtx.classLoader.loadClass(
+                val deviceInfoConstructor = classLoader.loadClass(
                     "io.hammerhead.datamodels.timeseriesData.models.DeviceInfo"
                 ).getDeclaredConstructor()
 
@@ -171,6 +184,7 @@ class KarooLightControl(private val context: Context) {
                     params[params.size - 1] = null
                     deviceConstructor.newInstance(*params) as Parcelable
                 }
+                Log.d(TAG, "Successfully created Karoo Device reflection creator")
             }
 
             pendingRegistrations.toList().forEach { registerConnectionState(it) }
@@ -209,6 +223,31 @@ class KarooLightControl(private val context: Context) {
         registeredListeners.clear()
         pendingRegistrations.clear()
         pendingLightParamRegistrations.clear()
+    }
+
+    fun getEffectiveHighMode(deviceId: String): String {
+        val supported = _supportedModes.value[deviceId]
+        if (!supported.isNullOrEmpty()) {
+            if ("STEADY1" in supported) return "STEADY1"
+            if ("STEADY4" in supported) return "STEADY4"
+            if ("STEADY_HIGH" in supported) return "STEADY_HIGH"
+            val nonOff = supported.filter { it != "OFF" }
+            if (nonOff.isNotEmpty()) return nonOff.first()
+        }
+        return "STEADY1"
+    }
+
+    fun getEffectiveLowMode(deviceId: String): String {
+        val supported = _supportedModes.value[deviceId]
+        if (!supported.isNullOrEmpty()) {
+            if ("STEADY5" in supported) return "STEADY5"
+            if ("STEADY2" in supported) return "STEADY2"
+            if ("STEADY3" in supported) return "STEADY3"
+            if ("STEADY_LOW" in supported) return "STEADY_LOW"
+            val nonOff = supported.filter { it != "OFF" }
+            if (nonOff.size > 1) return nonOff.last()
+        }
+        return "STEADY5"
     }
 
     fun setMode(deviceId: String, modeName: String) {
@@ -413,6 +452,7 @@ class KarooLightControl(private val context: Context) {
                     if (modeName != null) {
                         _actualModes.update { it + (deviceId to modeName) }
                     }
+                    Log.d(TAG, "Parsed LightParameters for $deviceId: activeMode=$modeName, supportedModes=$modes")
                     onStateChanged?.invoke()
                 }
             } finally {
