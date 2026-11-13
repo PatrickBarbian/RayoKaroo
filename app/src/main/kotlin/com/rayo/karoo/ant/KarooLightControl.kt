@@ -132,17 +132,18 @@ class KarooLightControl(private val context: Context) {
         }
     }
 
-    private fun writeFullDeviceParcel(dest: Parcel, uid: String, nullableInfo: Boolean, nullableConnType: Boolean) {
+    private fun writeFullDeviceParcel(dest: Parcel, uid: String, nullAsParcelable: Boolean, nullableConnType: Boolean) {
+        val nullObj: () -> Unit = { if (nullAsParcelable) dest.writeString(null) else dest.writeInt(0) }
         dest.writeString(uid) // 1. uid
-        if (nullableInfo) dest.writeInt(1)
-        // 2. DeviceInfo (7 fields)
+        // 2. info via writeParcelable -> class name + DeviceInfo fields
+        dest.writeString("io.hammerhead.datamodels.timeseriesData.models.DeviceInfo")
         dest.writeString("Light $uid") // name
         dest.writeString(null)         // axsBikeId
         dest.writeInt(0)               // syncedWithAxs
         dest.writeInt(0)               // nameEditedByUser
-        dest.writeInt(0)               // lastBatteryValue = null
-        dest.writeInt(0)               // manufacturerInfo = null
-        dest.writeInt(0)               // componentInfo = null
+        nullObj()                      // lastBatteryValue = null
+        nullObj()                      // manufacturerInfo = null
+        nullObj()                      // componentInfo = null
         // 3..17 Device fields
         dest.writeInt(0)               // 3. supportedDataTypes (empty)
         dest.writeInt(0)               // 4. blockedDataTypes (empty)
@@ -150,16 +151,16 @@ class KarooLightControl(private val context: Context) {
         dest.writeInt(1)               // 6. isConnectedAtLeastOnce = true
         if (nullableConnType) dest.writeInt(1)
         dest.writeString("ANT_PLUS")   // 7. connectionType
-        dest.writeInt(0)               // 8. wheelCircumferenceInfo = null
-        dest.writeInt(0)               // 9. shiftingInfo = null
-        dest.writeInt(0)               // 10. lightMode = null
+        nullObj()                      // 8. wheelCircumferenceInfo = null
+        nullObj()                      // 9. shiftingInfo = null
+        nullObj()                      // 10. lightMode = null
         dest.writeInt(0)               // 11. autoLightControl = null
         dest.writeInt(0)               // 12. ctfOffset = null
         dest.writeInt(3)               // 13. priority = 3
         dest.writeInt(0)               // 14. functionSets = null
         dest.writeInt(0)               // 15. axsPrimarySerial = null
         dest.writeInt(0)               // 16. alerts (empty)
-        dest.writeInt(0)               // 17. tirePressureAlerts = null
+        nullObj()                      // 17. tirePressureAlerts = null
     }
 
     private fun testDeviceParcelVariants(deviceId: String): Pair<Boolean, Boolean>? {
