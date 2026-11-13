@@ -149,8 +149,8 @@ class KarooLightControl(private val context: Context) {
         dest.writeInt(1)               // 5. isEnabled = true
         dest.writeInt(1)               // 6. isConnectedAtLeastOnce = true
         dest.writeInt(0)               // 7. connectionType (enum ordinal 0 in 0..3)
-        dest.writeString(null)         // 8. wheelCircumferenceInfo = null (readParcelable)
-        dest.writeString(null)         // 9. shiftingInfo = null (readParcelable)
+        dest.writeInt(0)               // 8. wheelCircumferenceInfo = null (0 = null)
+        dest.writeInt(0)               // 9. shiftingInfo = null (0 = null)
         dest.writeInt(0)               // 10. lightMode = null (0 = null!)
         dest.writeInt(0)               // 11. autoLightControl = null
         dest.writeInt(0)               // 12. ctfOffset = null
