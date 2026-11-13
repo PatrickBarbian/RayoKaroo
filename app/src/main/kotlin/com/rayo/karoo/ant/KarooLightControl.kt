@@ -132,13 +132,7 @@ class KarooLightControl(private val context: Context) {
         }
     }
 
-    private fun writeFullDeviceParcel(
-        dest: Parcel,
-        uid: String,
-        nullTireAsParcelable: Boolean,
-        nullFuncAsNeg: Boolean,
-        compAsZero: Boolean = false
-    ) {
+    private fun writeFullDeviceParcel(dest: Parcel, uid: String) {
         dest.writeString(uid) // 1. uid
         // 2. info via writeParcelable -> class name + DeviceInfo fields
         dest.writeString("io.hammerhead.datamodels.timeseriesData.models.DeviceInfo")
@@ -146,80 +140,25 @@ class KarooLightControl(private val context: Context) {
         dest.writeString(null)         // axsBikeId
         dest.writeInt(0)               // syncedWithAxs
         dest.writeInt(0)               // nameEditedByUser
-        dest.writeInt(0)               // lastBatteryValue = null (readInt == 0)
+        dest.writeInt(0)               // lastBatteryValue = null
         dest.writeString(null)         // manufacturerInfo = null (readParcelable)
-        if (compAsZero) dest.writeInt(0) else dest.writeString(null) // componentInfo
+        dest.writeInt(0)               // componentInfo = null
         // 3..17 Device fields
         dest.writeInt(0)               // 3. supportedDataTypes (empty)
         dest.writeInt(0)               // 4. blockedDataTypes (empty)
         dest.writeInt(1)               // 5. isEnabled = true
         dest.writeInt(1)               // 6. isConnectedAtLeastOnce = true
-        dest.writeInt(0)               // 7. connectionType (enum ordinal 0 in 0..3)
-        dest.writeInt(0)               // 8. wheelCircumferenceInfo = null (0 = null)
-        dest.writeInt(0)               // 9. shiftingInfo = null (0 = null)
-        dest.writeInt(0)               // 10. lightMode = null (0 = null!)
+        dest.writeInt(0)               // 7. connectionType (ANT_PLUS ordinal 0)
+        dest.writeInt(0)               // 8. wheelCircumferenceInfo = null
+        dest.writeInt(0)               // 9. shiftingInfo = null
+        dest.writeInt(0)               // 10. lightMode = null
         dest.writeInt(0)               // 11. autoLightControl = null
         dest.writeInt(0)               // 12. ctfOffset = null
         dest.writeInt(3)               // 13. priority = 3
-        dest.writeInt(if (nullFuncAsNeg) -1 else 0) // 14. functionSets = null
+        dest.writeInt(0)               // 14. functionSets = null
         dest.writeString(null)         // 15. axsPrimarySerial = null
         dest.writeInt(0)               // 16. alerts (empty)
-        if (nullTireAsParcelable) dest.writeString(null) else dest.writeInt(0) // 17. tirePressureAlerts = null
-    }
-
-    private fun testDeviceParcelVariants(deviceId: String): Pair<Boolean, Boolean>? {
-        val binder = lightCmdBinder ?: return null
-        val iface = IInterface { null }
-        val dummyListener = object : Binder() {
-            init { attachInterface(iface, LISTENER_DESCRIPTOR) }
-            override fun onTransact(code: Int, data: Parcel, reply: Parcel?, flags: Int): Boolean {
-                if (code in 1..16777215) data.enforceInterface(LISTENER_DESCRIPTOR)
-                if (code == 1) {
-                    data.readString(); data.readString()
-                    val bytes = data.createByteArray()
-                    data.readInt()
-                    if (bytes != null) parseLightParameters(deviceId, bytes)
-                }
-                reply?.writeNoException()
-                return true
-            }
-        }
-        data class Variant(
-            val label: String,
-            val compAsZero: Boolean,
-            val nullTire: Boolean,
-            val nullFunc: Boolean
-        )
-        val variants = listOf(
-            Variant("compStr_0_0", false, false, false),
-            Variant("compStr_negTire", false, true, false),
-            Variant("compStr_negFunc", false, false, true),
-            Variant("compStr_negBoth", false, true, true),
-            Variant("compZero_0_0", true, false, false),
-            Variant("compZero_negBoth", true, true, true),
-        )
-        for (v in variants) {
-            val d = Parcel.obtain()
-            val r = Parcel.obtain()
-            try {
-                val desc = binder.interfaceDescriptor ?: LIGHT_CMD_DESCRIPTOR
-                d.writeInterfaceToken(desc)
-                d.writeString("probe-dev-$deviceId-${v.label}")
-                d.writeInt(1)
-                writeFullDeviceParcel(d, deviceId, v.nullTire, v.nullFunc, v.compAsZero)
-                d.writeStrongBinder(dummyListener)
-                binder.transact(TX_REGISTER_LIGHT_PARAMS, d, r, 0)
-                r.readException()
-                Log.d(TAG, "SUCCESS Device parcel variant ${v.label}!")
-                return v.nullTire to v.nullFunc
-            } catch (e: Exception) {
-                Log.d(TAG, "Variant ${v.label} failed: ${e.message}")
-            } finally {
-                d.recycle()
-                r.recycle()
-            }
-        }
-        return null
+        dest.writeInt(0)               // 17. tirePressureAlerts = null
     }
 
     private fun loadLightModeClass() {
@@ -282,20 +221,16 @@ class KarooLightControl(private val context: Context) {
                     Log.d(TAG, "Successfully created Karoo Device reflection creator")
                 }
             } else {
-                Log.i(TAG, "Using built-in AIDL LightMode parcelable mirror (cross-process reflection restricted)")
-                val workingVariant = testDeviceParcelVariants("514597-35-113")
-                if (workingVariant != null) {
-                    val (nullInfo, nullConn) = workingVariant
-                    deviceCreator = { uid ->
-                        object : Parcelable {
-                            override fun describeContents() = 0
-                            override fun writeToParcel(dest: Parcel, flags: Int) {
-                                writeFullDeviceParcel(dest, uid, nullInfo, nullConn)
-                            }
+                Log.i(TAG, "Using built-in AIDL LightMode/Device parcelable mirror (cross-process reflection restricted)")
+                deviceCreator = { uid ->
+                    object : Parcelable {
+                        override fun describeContents() = 0
+                        override fun writeToParcel(dest: Parcel, flags: Int) {
+                            writeFullDeviceParcel(dest, uid)
                         }
                     }
-                    Log.i(TAG, "Built-in Device parcelable creator active (nullInfo=$nullInfo, nullConn=$nullConn)")
                 }
+                Log.i(TAG, "Built-in Device parcelable creator active")
             }
 
             pendingRegistrations.toList().forEach { registerConnectionState(it) }
