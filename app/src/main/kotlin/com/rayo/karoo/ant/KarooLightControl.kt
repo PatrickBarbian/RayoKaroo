@@ -106,8 +106,7 @@ class KarooLightControl(private val context: Context) {
 
     private fun getLightCommandBinder(service: IBinder) {
         val descriptor = service.interfaceDescriptor ?: SENSOR_DESCRIPTOR
-        Log.d(TAG, "Probing SensorServiceAIDL ($descriptor) TX 1..30")
-        for (code in 1..30) {
+        for (code in 1..25) {
             val d = Parcel.obtain()
             val r = Parcel.obtain()
             try {
@@ -115,50 +114,17 @@ class KarooLightControl(private val context: Context) {
                 val success = service.transact(code, d, r, 0)
                 if (success) {
                     r.readException()
-                    val avail = r.dataAvail()
-                    val pos = r.dataPosition()
                     val b = try { r.readStrongBinder() } catch (_: Exception) { null }
                     if (b != null) {
                         val desc = b.interfaceDescriptor
-                        Log.d(TAG, "SensorService TX $code -> Binder: $desc")
                         if (desc?.contains("Light", ignoreCase = true) == true) {
                             lightCmdBinder = b
                             Log.d(TAG, "Matched LightCommand binder at TX code $code: $desc")
-                            probeLightCmdBinder(b, desc)
+                            break
                         }
-                    } else if (avail > 0) {
-                        r.setDataPosition(pos)
-                        val bytes = r.marshall()
-                        val hex = bytes.take(64).joinToString("") { "%02x".format(it) }
-                        Log.d(TAG, "SensorService TX $code -> Data avail=$avail total=${bytes.size} hex=$hex")
-                    } else {
-                        Log.d(TAG, "SensorService TX $code -> void/empty")
                     }
                 }
-            } catch (e: Exception) {
-                Log.d(TAG, "SensorService TX $code -> err: ${e.javaClass.simpleName}: ${e.message}")
-            } finally {
-                d.recycle()
-                r.recycle()
-            }
-        }
-        probeSensorListeners(service, descriptor)
-    }
-
-    private fun probeLightCmdBinder(binder: IBinder, descriptor: String) {
-        Log.d(TAG, "Probing LightCommandConnectionAIDL TX 1..10")
-        for (code in 1..10) {
-            val d = Parcel.obtain()
-            val r = Parcel.obtain()
-            try {
-                d.writeInterfaceToken(descriptor)
-                val success = binder.transact(code, d, r, 0)
-                if (success) {
-                    r.readException()
-                    Log.d(TAG, "LightCmd TX $code -> success avail=${r.dataAvail()}")
-                }
-            } catch (e: Exception) {
-                Log.d(TAG, "LightCmd TX $code -> err: ${e.javaClass.simpleName}: ${e.message}")
+            } catch (_: Exception) {
             } finally {
                 d.recycle()
                 r.recycle()
@@ -166,52 +132,76 @@ class KarooLightControl(private val context: Context) {
         }
     }
 
-    private fun probeSensorListeners(service: IBinder, descriptor: String) {
+    private fun writeFullDeviceParcel(dest: Parcel, uid: String, nullableInfo: Boolean, nullableConnType: Boolean) {
+        dest.writeString(uid) // 1. uid
+        if (nullableInfo) dest.writeInt(1)
+        // 2. DeviceInfo (7 fields)
+        dest.writeString("Light $uid") // name
+        dest.writeString(null)         // axsBikeId
+        dest.writeInt(0)               // syncedWithAxs
+        dest.writeInt(0)               // nameEditedByUser
+        dest.writeInt(0)               // lastBatteryValue = null
+        dest.writeInt(0)               // manufacturerInfo = null
+        dest.writeInt(0)               // componentInfo = null
+        // 3..17 Device fields
+        dest.writeInt(0)               // 3. supportedDataTypes (empty)
+        dest.writeInt(0)               // 4. blockedDataTypes (empty)
+        dest.writeInt(1)               // 5. isEnabled = true
+        dest.writeInt(1)               // 6. isConnectedAtLeastOnce = true
+        if (nullableConnType) dest.writeInt(1)
+        dest.writeString("ANT_PLUS")   // 7. connectionType
+        dest.writeInt(0)               // 8. wheelCircumferenceInfo = null
+        dest.writeInt(0)               // 9. shiftingInfo = null
+        dest.writeInt(0)               // 10. lightMode = null
+        dest.writeInt(0)               // 11. autoLightControl = null
+        dest.writeInt(0)               // 12. ctfOffset = null
+        dest.writeInt(3)               // 13. priority = 3
+        dest.writeInt(0)               // 14. functionSets = null
+        dest.writeInt(0)               // 15. axsPrimarySerial = null
+        dest.writeInt(0)               // 16. alerts (empty)
+        dest.writeInt(0)               // 17. tirePressureAlerts = null
+    }
+
+    private fun testDeviceParcelVariants(deviceId: String): Pair<Boolean, Boolean>? {
+        val binder = lightCmdBinder ?: return null
         val iface = IInterface { null }
-        val listenerBinder = object : Binder() {
+        val dummyListener = object : Binder() {
             init { attachInterface(iface, LISTENER_DESCRIPTOR) }
             override fun onTransact(code: Int, data: Parcel, reply: Parcel?, flags: Int): Boolean {
                 if (code in 1..16777215) data.enforceInterface(LISTENER_DESCRIPTOR)
                 if (code == 1) {
-                    val s1 = data.readString()
-                    val s2 = data.readString()
+                    data.readString(); data.readString()
                     val bytes = data.createByteArray()
-                    val i1 = data.readInt()
-                    val len = bytes?.size ?: -1
-                    Log.d(TAG, "ProbeListener callback s1=$s1 s2=$s2 i1=$i1 len=$len")
-                    if (bytes != null) {
-                        bytes.toList().chunked(128).forEachIndexed { idx, chunk ->
-                            val hex = chunk.joinToString("") { "%02x".format(it) }
-                            val ascii = chunk.map { b -> val c = b.toInt() and 0xFF; if (c in 32..126) c.toChar() else '.' }.joinToString("")
-                            Log.d(TAG, "ProbeListener [$idx] hex=$hex ascii=$ascii")
-                        }
-                    }
-                    reply?.writeNoException()
-                    return true
+                    data.readInt()
+                    if (bytes != null) parseLightParameters(deviceId, bytes)
                 }
                 reply?.writeNoException()
                 return true
             }
         }
-        Log.d(TAG, "Probing SensorServiceAIDL TX 1..14 with (id, listener)")
-        for (code in listOf(1, 2, 4, 8, 10, 12, 13, 14)) {
+        val variants = listOf(false to false, true to false, false to true, true to true)
+        for ((nullInfo, nullConn) in variants) {
             val d = Parcel.obtain()
             val r = Parcel.obtain()
             try {
-                d.writeInterfaceToken(descriptor)
-                d.writeString("probe-$code")
-                d.writeStrongBinder(listenerBinder)
-                if (service.transact(code, d, r, 0)) {
-                    r.readException()
-                    Log.d(TAG, "SensorService TX $code (id,binder) -> success avail=${r.dataAvail()}")
-                }
+                val desc = binder.interfaceDescriptor ?: LIGHT_CMD_DESCRIPTOR
+                d.writeInterfaceToken(desc)
+                d.writeString("probe-dev-$deviceId-$nullInfo-$nullConn")
+                d.writeInt(1)
+                writeFullDeviceParcel(d, deviceId, nullInfo, nullConn)
+                d.writeStrongBinder(dummyListener)
+                binder.transact(TX_REGISTER_LIGHT_PARAMS, d, r, 0)
+                r.readException()
+                Log.d(TAG, "SUCCESS Device parcel variant nullInfo=$nullInfo nullConn=$nullConn!")
+                return nullInfo to nullConn
             } catch (e: Exception) {
-                Log.d(TAG, "SensorService TX $code (id,binder) -> err: ${e.javaClass.simpleName}: ${e.message}")
+                Log.d(TAG, "Variant nullInfo=$nullInfo nullConn=$nullConn failed: ${e.message}")
             } finally {
                 d.recycle()
                 r.recycle()
             }
         }
+        return null
     }
 
     private fun loadLightModeClass() {
@@ -275,6 +265,19 @@ class KarooLightControl(private val context: Context) {
                 }
             } else {
                 Log.i(TAG, "Using built-in AIDL LightMode parcelable mirror (cross-process reflection restricted)")
+                val workingVariant = testDeviceParcelVariants("514597-35-113")
+                if (workingVariant != null) {
+                    val (nullInfo, nullConn) = workingVariant
+                    deviceCreator = { uid ->
+                        object : Parcelable {
+                            override fun describeContents() = 0
+                            override fun writeToParcel(dest: Parcel, flags: Int) {
+                                writeFullDeviceParcel(dest, uid, nullInfo, nullConn)
+                            }
+                        }
+                    }
+                    Log.i(TAG, "Built-in Device parcelable creator active (nullInfo=$nullInfo, nullConn=$nullConn)")
+                }
             }
 
             pendingRegistrations.toList().forEach { registerConnectionState(it) }
