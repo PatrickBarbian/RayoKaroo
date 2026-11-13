@@ -42,9 +42,7 @@ class KarooLightControl(private val context: Context) {
     private var lightModeParcelableCreator: ((String) -> Parcelable)? = { modeName ->
         io.hammerhead.datamodels.timeseriesData.models.LightMode.fromName(modeName)
     }
-    private var deviceCreator: ((String) -> Parcelable)? = { uid ->
-        io.hammerhead.datamodels.timeseriesData.models.Device(uid)
-    }
+    private var deviceCreator: ((String) -> Parcelable)? = null
     private var isBound = false
     private var bindRequested = false
 
@@ -238,13 +236,13 @@ class KarooLightControl(private val context: Context) {
     fun getEffectiveHighMode(deviceId: String): String {
         val supported = _supportedModes.value[deviceId]
         if (!supported.isNullOrEmpty()) {
-            if ("STEADY1" in supported) return "STEADY1"
             if ("STEADY4" in supported) return "STEADY4"
             if ("STEADY_HIGH" in supported) return "STEADY_HIGH"
+            if ("STEADY1" in supported) return "STEADY1"
             val nonOff = supported.filter { it != "OFF" }
             if (nonOff.isNotEmpty()) return nonOff.first()
         }
-        return "STEADY1"
+        return "STEADY4"
     }
 
     fun getEffectiveLowMode(deviceId: String): String {
@@ -284,9 +282,13 @@ class KarooLightControl(private val context: Context) {
             val descriptor = binder.interfaceDescriptor ?: LIGHT_CMD_DESCRIPTOR
             data.writeInterfaceToken(descriptor)
             data.writeString(deviceId)
-            val device = deviceCreator?.invoke(deviceId) ?: io.hammerhead.datamodels.timeseriesData.models.Device(deviceId)
-            data.writeInt(1)
-            device.writeToParcel(data, 0)
+            val device = deviceCreator?.invoke(deviceId)
+            if (device != null) {
+                data.writeInt(1)
+                device.writeToParcel(data, 0)
+            } else {
+                data.writeInt(0)
+            }
             val bundle = Bundle()
             bundle.classLoader = lightMode.javaClass.classLoader
             bundle.putParcelable("value", lightMode)
@@ -311,11 +313,11 @@ class KarooLightControl(private val context: Context) {
 
     fun registerConnectionState(deviceId: String) {
         val binder = sensorBinder
-        if (binder == null) {
-            pendingRegistrations.add(deviceId)
+        val creator = deviceCreator
+        if (binder == null || creator == null) {
             return
         }
-        val device = deviceCreator?.invoke(deviceId) ?: io.hammerhead.datamodels.timeseriesData.models.Device(deviceId)
+        val device = creator(deviceId)
         val listenerId = "light-conn-$deviceId"
         if (listenerId in registeredListeners) return
 
@@ -381,11 +383,11 @@ class KarooLightControl(private val context: Context) {
 
     fun registerForLightParameters(deviceId: String) {
         val binder = lightCmdBinder
-        if (binder == null) {
-            pendingLightParamRegistrations.add(deviceId)
+        val creator = deviceCreator
+        if (binder == null || creator == null) {
             return
         }
-        val device = deviceCreator?.invoke(deviceId) ?: io.hammerhead.datamodels.timeseriesData.models.Device(deviceId)
+        val device = creator(deviceId)
         val listenerId = "light-params-$deviceId"
         if (listenerId in registeredListeners) return
 
