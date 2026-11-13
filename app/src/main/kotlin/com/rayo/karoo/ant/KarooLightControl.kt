@@ -106,7 +106,8 @@ class KarooLightControl(private val context: Context) {
 
     private fun getLightCommandBinder(service: IBinder) {
         val descriptor = service.interfaceDescriptor ?: SENSOR_DESCRIPTOR
-        for (code in 1..25) {
+        Log.d(TAG, "Probing SensorServiceAIDL ($descriptor) TX 1..30")
+        for (code in 1..30) {
             val d = Parcel.obtain()
             val r = Parcel.obtain()
             try {
@@ -114,17 +115,27 @@ class KarooLightControl(private val context: Context) {
                 val success = service.transact(code, d, r, 0)
                 if (success) {
                     r.readException()
-                    val b = r.readStrongBinder()
+                    val avail = r.dataAvail()
+                    val pos = r.dataPosition()
+                    val b = try { r.readStrongBinder() } catch (_: Exception) { null }
                     if (b != null) {
                         val desc = b.interfaceDescriptor
+                        Log.d(TAG, "SensorService TX $code -> Binder: $desc")
                         if (desc?.contains("Light", ignoreCase = true) == true) {
                             lightCmdBinder = b
                             Log.d(TAG, "Matched LightCommand binder at TX code $code: $desc")
-                            break
                         }
+                    } else if (avail > 0) {
+                        r.setDataPosition(pos)
+                        val bytes = r.marshall()
+                        val hex = bytes.take(64).joinToString("") { "%02x".format(it) }
+                        Log.d(TAG, "SensorService TX $code -> Data avail=$avail total=${bytes.size} hex=$hex")
+                    } else {
+                        Log.d(TAG, "SensorService TX $code -> void/empty")
                     }
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                Log.d(TAG, "SensorService TX $code -> err: ${e.javaClass.simpleName}: ${e.message}")
             } finally {
                 d.recycle()
                 r.recycle()
