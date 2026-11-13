@@ -46,8 +46,10 @@ enum class LightMode : Parcelable {
             val upper = name.uppercase().trim()
             return when {
                 upper == "OFF" || upper == "AUS" -> OFF
-                upper == "STEADY1" || upper == "STEADY4" || upper == "STEADY_HIGH" || upper == "HIGH" || upper == "HELL" -> STEADY1
-                upper == "STEADY5" || upper == "STEADY2" || upper == "STEADY3" || upper == "STEADY_LOW" || upper == "LOW" || upper == "SPAR" -> STEADY5
+                upper == "STEADY4" -> STEADY4
+                upper == "STEADY5" -> STEADY5
+                upper == "STEADY1" || upper == "STEADY_HIGH" || upper == "HIGH" || upper == "HELL" -> STEADY4
+                upper == "STEADY2" || upper == "STEADY3" || upper == "STEADY_LOW" || upper == "LOW" || upper == "SPAR" -> STEADY5
                 upper == "DAY_FLASH" || upper == "DAY_PULSE" || upper == "FLASH1" -> DAY_FLASH
                 upper == "NIGHT_FLASH" || upper == "FLASH2" -> NIGHT_FLASH
                 upper == "AUTO" || upper == "SMART" -> AUTO

@@ -314,39 +314,63 @@ class KarooLightControl(private val context: Context) {
             return false
         }
 
-        val data = Parcel.obtain()
-        val reply = Parcel.obtain()
-        try {
-            val descriptor = binder.interfaceDescriptor ?: LIGHT_CMD_DESCRIPTOR
-            data.writeInterfaceToken(descriptor)
-            data.writeString(deviceId)
-            val device = deviceCreator?.invoke(deviceId)
-            if (device != null) {
-                data.writeInt(1)
-                device.writeToParcel(data, 0)
-            } else {
-                data.writeInt(0)
+        val descriptor = binder.interfaceDescriptor ?: LIGHT_CMD_DESCRIPTOR
+        val device = deviceCreator?.invoke(deviceId)
+        val modes = listOf("bundleStr", "directLightMode", "directStr", "bundleParcel", "noIdDirectMode")
+        for (variant in modes) {
+            val data = Parcel.obtain()
+            val reply = Parcel.obtain()
+            try {
+                data.writeInterfaceToken(descriptor)
+                if (variant != "noIdDirectMode") {
+                    data.writeString(deviceId)
+                }
+                if (device != null) {
+                    data.writeInt(1)
+                    device.writeToParcel(data, 0)
+                } else {
+                    data.writeInt(0)
+                }
+                when (variant) {
+                    "bundleStr" -> {
+                        val b = Bundle()
+                        b.putString("value", modeName)
+                        b.putString("mode", modeName)
+                        b.putString("lightMode", modeName)
+                        data.writeInt(1)
+                        b.writeToParcel(data, 0)
+                    }
+                    "bundleParcel" -> {
+                        val b = Bundle()
+                        b.classLoader = lightMode.javaClass.classLoader
+                        b.putParcelable("value", lightMode)
+                        data.writeInt(1)
+                        b.writeToParcel(data, 0)
+                    }
+                    "directLightMode", "noIdDirectMode" -> {
+                        data.writeInt(1)
+                        lightMode.writeToParcel(data, 0)
+                    }
+                    "directStr" -> {
+                        data.writeString(modeName)
+                    }
+                }
+                binder.transact(TX_SET_LIGHT_MODE, data, reply, 0)
+                reply.readException()
+                Log.d(TAG, "executeSetLightMode($deviceId, $modeName) succeeded via $variant!")
+                lastCommandedMode[deviceId] = modeName
+                _actualModes.update { it + (deviceId to modeName) }
+                onStateChanged?.invoke()
+                return true
+            } catch (e: Exception) {
+                Log.d(TAG, "executeSetLightMode($deviceId, $modeName) variant=$variant failed: ${e.message}")
+            } finally {
+                data.recycle()
+                reply.recycle()
             }
-            val bundle = Bundle()
-            bundle.classLoader = lightMode.javaClass.classLoader
-            bundle.putParcelable("value", lightMode)
-            data.writeInt(1)
-            bundle.writeToParcel(data, 0)
-
-            binder.transact(TX_SET_LIGHT_MODE, data, reply, 0)
-            reply.readException()
-            Log.d(TAG, "executeSetLightMode($deviceId, $modeName) succeeded!")
-            lastCommandedMode[deviceId] = modeName
-            _actualModes.update { it + (deviceId to modeName) }
-            onStateChanged?.invoke()
-            return true
-        } catch (e: Exception) {
-            Log.e(TAG, "executeSetLightMode($deviceId, $modeName) failed", e)
-            return false
-        } finally {
-            data.recycle()
-            reply.recycle()
         }
+        Log.e(TAG, "executeSetLightMode($deviceId, $modeName) all variants failed")
+        return false
     }
 
     fun registerConnectionState(deviceId: String) {
