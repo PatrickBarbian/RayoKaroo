@@ -132,7 +132,7 @@ class KarooLightControl(private val context: Context) {
         }
     }
 
-    private fun writeFullDeviceParcel(dest: Parcel, uid: String) {
+    private fun writeFullDeviceParcel(dest: Parcel, uid: String, lightModeName: String? = null) {
         dest.writeString(uid) // 1. uid
         // 2. info via writeParcelable -> class name + DeviceInfo fields
         dest.writeString("io.hammerhead.datamodels.timeseriesData.models.DeviceInfo")
@@ -151,7 +151,12 @@ class KarooLightControl(private val context: Context) {
         dest.writeInt(0)               // 7. connectionType (ANT_PLUS ordinal 0)
         dest.writeInt(0)               // 8. wheelCircumferenceInfo = null
         dest.writeInt(0)               // 9. shiftingInfo = null
-        dest.writeInt(0)               // 10. lightMode = null
+        if (lightModeName != null) {
+            dest.writeInt(1)
+            dest.writeString(lightModeName)
+        } else {
+            dest.writeInt(0)           // 10. lightMode = null
+        }
         dest.writeInt(0)               // 11. autoLightControl = null
         dest.writeInt(0)               // 12. ctfOffset = null
         dest.writeInt(3)               // 13. priority = 3
@@ -315,44 +320,42 @@ class KarooLightControl(private val context: Context) {
         }
 
         val descriptor = binder.interfaceDescriptor ?: LIGHT_CMD_DESCRIPTOR
-        val device = deviceCreator?.invoke(deviceId)
-        val modes = listOf("bundleStr", "directLightMode", "directStr", "bundleParcel", "noIdDirectMode")
+        val modes = listOf("devMode_bundleParcel", "devMode_only", "devMode_directMode", "strMode_dev", "devNull_bundleNull")
         for (variant in modes) {
             val data = Parcel.obtain()
             val reply = Parcel.obtain()
             try {
                 data.writeInterfaceToken(descriptor)
-                if (variant != "noIdDirectMode") {
-                    data.writeString(deviceId)
-                }
-                if (device != null) {
-                    data.writeInt(1)
-                    device.writeToParcel(data, 0)
-                } else {
-                    data.writeInt(0)
-                }
+                data.writeString(deviceId)
                 when (variant) {
-                    "bundleStr" -> {
-                        val b = Bundle()
-                        b.putString("value", modeName)
-                        b.putString("mode", modeName)
-                        b.putString("lightMode", modeName)
+                    "devMode_bundleParcel" -> {
                         data.writeInt(1)
-                        b.writeToParcel(data, 0)
-                    }
-                    "bundleParcel" -> {
+                        writeFullDeviceParcel(data, deviceId, modeName)
                         val b = Bundle()
                         b.classLoader = lightMode.javaClass.classLoader
                         b.putParcelable("value", lightMode)
                         data.writeInt(1)
                         b.writeToParcel(data, 0)
                     }
-                    "directLightMode", "noIdDirectMode" -> {
+                    "devMode_only" -> {
+                        data.writeInt(1)
+                        writeFullDeviceParcel(data, deviceId, modeName)
+                    }
+                    "devMode_directMode" -> {
+                        data.writeInt(1)
+                        writeFullDeviceParcel(data, deviceId, modeName)
                         data.writeInt(1)
                         lightMode.writeToParcel(data, 0)
                     }
-                    "directStr" -> {
+                    "strMode_dev" -> {
                         data.writeString(modeName)
+                        data.writeInt(1)
+                        writeFullDeviceParcel(data, deviceId, modeName)
+                    }
+                    "devNull_bundleNull" -> {
+                        data.writeInt(1)
+                        writeFullDeviceParcel(data, deviceId, null)
+                        data.writeInt(0)
                     }
                 }
                 binder.transact(TX_SET_LIGHT_MODE, data, reply, 0)
