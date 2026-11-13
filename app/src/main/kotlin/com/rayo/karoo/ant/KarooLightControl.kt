@@ -124,6 +124,7 @@ class KarooLightControl(private val context: Context) {
                         if (desc?.contains("Light", ignoreCase = true) == true) {
                             lightCmdBinder = b
                             Log.d(TAG, "Matched LightCommand binder at TX code $code: $desc")
+                            probeLightCmdBinder(b, desc)
                         }
                     } else if (avail > 0) {
                         r.setDataPosition(pos)
@@ -136,6 +137,71 @@ class KarooLightControl(private val context: Context) {
                 }
             } catch (e: Exception) {
                 Log.d(TAG, "SensorService TX $code -> err: ${e.javaClass.simpleName}: ${e.message}")
+            } finally {
+                d.recycle()
+                r.recycle()
+            }
+        }
+        probeSensorListeners(service, descriptor)
+    }
+
+    private fun probeLightCmdBinder(binder: IBinder, descriptor: String) {
+        Log.d(TAG, "Probing LightCommandConnectionAIDL TX 1..10")
+        for (code in 1..10) {
+            val d = Parcel.obtain()
+            val r = Parcel.obtain()
+            try {
+                d.writeInterfaceToken(descriptor)
+                val success = binder.transact(code, d, r, 0)
+                if (success) {
+                    r.readException()
+                    Log.d(TAG, "LightCmd TX $code -> success avail=${r.dataAvail()}")
+                }
+            } catch (e: Exception) {
+                Log.d(TAG, "LightCmd TX $code -> err: ${e.javaClass.simpleName}: ${e.message}")
+            } finally {
+                d.recycle()
+                r.recycle()
+            }
+        }
+    }
+
+    private fun probeSensorListeners(service: IBinder, descriptor: String) {
+        val iface = IInterface { null }
+        val listenerBinder = object : Binder() {
+            init { attachInterface(iface, LISTENER_DESCRIPTOR) }
+            override fun onTransact(code: Int, data: Parcel, reply: Parcel?, flags: Int): Boolean {
+                if (code in 1..16777215) data.enforceInterface(LISTENER_DESCRIPTOR)
+                if (code == 1) {
+                    val s1 = data.readString()
+                    val s2 = data.readString()
+                    val bytes = data.createByteArray()
+                    val i1 = data.readInt()
+                    val hex = bytes?.take(128)?.joinToString("") { "%02x".format(it) } ?: "null"
+                    Log.d(TAG, "ProbeListener callback s1=$s1 s2=$s2 i1=$i1 len=${bytes?.size} hex=$hex")
+                    reply?.writeNoException()
+                    return true
+                }
+                reply?.writeNoException()
+                return true
+            }
+        }
+        Log.d(TAG, "Probing SensorServiceAIDL TX 1..14 with (id, listener)")
+        for (code in 1..14) {
+            if (code == 5 || code == 6) continue
+            val d = Parcel.obtain()
+            val r = Parcel.obtain()
+            try {
+                d.writeInterfaceToken(descriptor)
+                d.writeString("probe-$code")
+                d.writeInt(0) // null device if expected
+                d.writeStrongBinder(listenerBinder)
+                if (service.transact(code, d, r, 0)) {
+                    r.readException()
+                    Log.d(TAG, "SensorService TX $code (with id,null,binder) -> success avail=${r.dataAvail()}")
+                }
+            } catch (e: Exception) {
+                Log.d(TAG, "SensorService TX $code (with id,null,binder) -> err: ${e.javaClass.simpleName}: ${e.message}")
             } finally {
                 d.recycle()
                 r.recycle()
