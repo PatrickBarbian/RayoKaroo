@@ -177,8 +177,15 @@ class KarooLightControl(private val context: Context) {
                     val s2 = data.readString()
                     val bytes = data.createByteArray()
                     val i1 = data.readInt()
-                    val hex = bytes?.take(128)?.joinToString("") { "%02x".format(it) } ?: "null"
-                    Log.d(TAG, "ProbeListener callback s1=$s1 s2=$s2 i1=$i1 len=${bytes?.size} hex=$hex")
+                    val len = bytes?.size ?: -1
+                    Log.d(TAG, "ProbeListener callback s1=$s1 s2=$s2 i1=$i1 len=$len")
+                    if (bytes != null) {
+                        bytes.toList().chunked(128).forEachIndexed { idx, chunk ->
+                            val hex = chunk.joinToString("") { "%02x".format(it) }
+                            val ascii = chunk.map { b -> val c = b.toInt() and 0xFF; if (c in 32..126) c.toChar() else '.' }.joinToString("")
+                            Log.d(TAG, "ProbeListener [$idx] hex=$hex ascii=$ascii")
+                        }
+                    }
                     reply?.writeNoException()
                     return true
                 }
@@ -187,21 +194,19 @@ class KarooLightControl(private val context: Context) {
             }
         }
         Log.d(TAG, "Probing SensorServiceAIDL TX 1..14 with (id, listener)")
-        for (code in 1..14) {
-            if (code == 5 || code == 6) continue
+        for (code in listOf(1, 2, 4, 8, 10, 12, 13, 14)) {
             val d = Parcel.obtain()
             val r = Parcel.obtain()
             try {
                 d.writeInterfaceToken(descriptor)
                 d.writeString("probe-$code")
-                d.writeInt(0) // null device if expected
                 d.writeStrongBinder(listenerBinder)
                 if (service.transact(code, d, r, 0)) {
                     r.readException()
-                    Log.d(TAG, "SensorService TX $code (with id,null,binder) -> success avail=${r.dataAvail()}")
+                    Log.d(TAG, "SensorService TX $code (id,binder) -> success avail=${r.dataAvail()}")
                 }
             } catch (e: Exception) {
-                Log.d(TAG, "SensorService TX $code (with id,null,binder) -> err: ${e.javaClass.simpleName}: ${e.message}")
+                Log.d(TAG, "SensorService TX $code (id,binder) -> err: ${e.javaClass.simpleName}: ${e.message}")
             } finally {
                 d.recycle()
                 r.recycle()
