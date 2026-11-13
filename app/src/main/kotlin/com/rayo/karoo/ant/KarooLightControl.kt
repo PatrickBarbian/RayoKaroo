@@ -150,7 +150,7 @@ class KarooLightControl(private val context: Context) {
         dest.writeInt(1)               // 5. isEnabled = true
         dest.writeInt(1)               // 6. isConnectedAtLeastOnce = true
         if (nullableConnType) dest.writeInt(1)
-        dest.writeString("ANT_PLUS")   // 7. connectionType
+        dest.writeInt(0)               // 7. connectionType (enum ordinal 0 in 0..3)
         nullObj()                      // 8. wheelCircumferenceInfo = null
         nullObj()                      // 9. shiftingInfo = null
         nullObj()                      // 10. lightMode = null
