@@ -137,44 +137,39 @@ class KarooLightControl(private val context: Context) {
         uid: String,
         nullTireAsParcelable: Boolean,
         nullFuncAsNeg: Boolean,
-        probeAxs: Boolean = false,
-        nonNullLightMode: Boolean = false,
-        negWheelShift: Boolean = false
+        probeField: String? = null,
+        parcelizeDeviceInfoNulls: Boolean = false
     ) {
         dest.writeString(uid) // 1. uid
         // 2. info via writeParcelable -> class name + DeviceInfo fields
         dest.writeString("io.hammerhead.datamodels.timeseriesData.models.DeviceInfo")
         dest.writeString("Light $uid") // name
-        dest.writeString(null)         // axsBikeId
+        dest.writeString(if (probeField == "bike") "PROBE_BIKE" else null) // axsBikeId
         dest.writeInt(0)               // syncedWithAxs
         dest.writeInt(0)               // nameEditedByUser
-        dest.writeString(null)         // lastBatteryValue = null (readParcelable)
-        dest.writeString(null)         // manufacturerInfo = null (readParcelable)
-        dest.writeString(null)         // componentInfo = null (readParcelable)
+        if (parcelizeDeviceInfoNulls) {
+            dest.writeInt(0)           // lastBatteryValue
+            dest.writeInt(0)           // manufacturerInfo
+            dest.writeInt(0)           // componentInfo
+        } else {
+            dest.writeString(if (probeField == "bat") "PROBE_BAT" else null)   // lastBatteryValue
+            dest.writeString(if (probeField == "mfg") "PROBE_MFG" else null)   // manufacturerInfo
+            dest.writeString(if (probeField == "comp") "PROBE_COMP" else null) // componentInfo
+        }
         // 3..17 Device fields
         dest.writeInt(0)               // 3. supportedDataTypes (empty)
         dest.writeInt(0)               // 4. blockedDataTypes (empty)
         dest.writeInt(1)               // 5. isEnabled = true
         dest.writeInt(1)               // 6. isConnectedAtLeastOnce = true
         dest.writeInt(0)               // 7. connectionType (enum ordinal 0 in 0..3)
-        if (negWheelShift) {
-            dest.writeString(null)     // 8. wheelCircumferenceInfo = null (readParcelable)
-            dest.writeString(null)     // 9. shiftingInfo = null (readParcelable)
-        } else {
-            dest.writeInt(0)           // 8. wheelCircumferenceInfo = null (0 = null)
-            dest.writeInt(0)           // 9. shiftingInfo = null (0 = null)
-        }
-        if (nonNullLightMode) {
-            dest.writeInt(1)           // 10. lightMode present
-            dest.writeString("STEADY4")
-        } else {
-            dest.writeInt(0)           // 10. lightMode = null (0 = null!)
-        }
+        dest.writeInt(0)               // 8. wheelCircumferenceInfo = null (0 = null)
+        dest.writeInt(0)               // 9. shiftingInfo = null (0 = null)
+        dest.writeInt(0)               // 10. lightMode = null (0 = null!)
         dest.writeInt(0)               // 11. autoLightControl = null
         dest.writeInt(0)               // 12. ctfOffset = null
         dest.writeInt(3)               // 13. priority = 3
         dest.writeInt(if (nullFuncAsNeg) -1 else 0) // 14. functionSets = null
-        dest.writeString(if (probeAxs) "PROBE_AXS" else null) // 15. axsPrimarySerial
+        dest.writeString(null)         // 15. axsPrimarySerial = null
         dest.writeInt(0)               // 16. alerts (empty)
         if (nullTireAsParcelable) dest.writeString(null) else dest.writeInt(0) // 17. tirePressureAlerts = null
     }
@@ -198,19 +193,18 @@ class KarooLightControl(private val context: Context) {
         }
         data class Variant(
             val label: String,
-            val nullTire: Boolean,
-            val nullFunc: Boolean,
-            val probeAxs: Boolean = false,
-            val nonNullLightMode: Boolean = false,
-            val negWheelShift: Boolean = false
+            val probeField: String? = null,
+            val parcelizeInfo: Boolean = false,
+            val nullTire: Boolean = false,
+            val nullFunc: Boolean = false
         )
         val variants = listOf(
-            Variant("probeAxs", false, false, probeAxs = true),
-            Variant("lightModeSteady4", false, false, nonNullLightMode = true),
-            Variant("lightModeSteady4_tireNeg", true, false, nonNullLightMode = true),
-            Variant("lightModeSteady4_funcNeg", false, true, nonNullLightMode = true),
-            Variant("lightModeSteady4_bothNeg", true, true, nonNullLightMode = true),
-            Variant("negWheelShift_probeAxs", false, false, probeAxs = true, negWheelShift = true),
+            Variant("probeBike", probeField = "bike"),
+            Variant("probeBat", probeField = "bat"),
+            Variant("probeMfg", probeField = "mfg"),
+            Variant("probeComp", probeField = "comp"),
+            Variant("parcelizeInfo0", parcelizeInfo = true),
+            Variant("parcelizeInfo0_neg", parcelizeInfo = true, nullTire = true, nullFunc = true),
         )
         for (v in variants) {
             val d = Parcel.obtain()
@@ -220,7 +214,7 @@ class KarooLightControl(private val context: Context) {
                 d.writeInterfaceToken(desc)
                 d.writeString("probe-dev-$deviceId-${v.label}")
                 d.writeInt(1)
-                writeFullDeviceParcel(d, deviceId, v.nullTire, v.nullFunc, v.probeAxs, v.nonNullLightMode, v.negWheelShift)
+                writeFullDeviceParcel(d, deviceId, v.nullTire, v.nullFunc, v.probeField, v.parcelizeInfo)
                 d.writeStrongBinder(dummyListener)
                 binder.transact(TX_REGISTER_LIGHT_PARAMS, d, r, 0)
                 r.readException()
