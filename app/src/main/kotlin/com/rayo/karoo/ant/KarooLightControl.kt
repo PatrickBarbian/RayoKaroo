@@ -132,7 +132,15 @@ class KarooLightControl(private val context: Context) {
         }
     }
 
-    private fun writeFullDeviceParcel(dest: Parcel, uid: String, nullTireAsParcelable: Boolean, nullFuncAsNeg: Boolean) {
+    private fun writeFullDeviceParcel(
+        dest: Parcel,
+        uid: String,
+        nullTireAsParcelable: Boolean,
+        nullFuncAsNeg: Boolean,
+        probeAxs: Boolean = false,
+        nonNullLightMode: Boolean = false,
+        negWheelShift: Boolean = false
+    ) {
         dest.writeString(uid) // 1. uid
         // 2. info via writeParcelable -> class name + DeviceInfo fields
         dest.writeString("io.hammerhead.datamodels.timeseriesData.models.DeviceInfo")
@@ -149,14 +157,24 @@ class KarooLightControl(private val context: Context) {
         dest.writeInt(1)               // 5. isEnabled = true
         dest.writeInt(1)               // 6. isConnectedAtLeastOnce = true
         dest.writeInt(0)               // 7. connectionType (enum ordinal 0 in 0..3)
-        dest.writeInt(0)               // 8. wheelCircumferenceInfo = null (0 = null)
-        dest.writeInt(0)               // 9. shiftingInfo = null (0 = null)
-        dest.writeInt(0)               // 10. lightMode = null (0 = null!)
+        if (negWheelShift) {
+            dest.writeString(null)     // 8. wheelCircumferenceInfo = null (readParcelable)
+            dest.writeString(null)     // 9. shiftingInfo = null (readParcelable)
+        } else {
+            dest.writeInt(0)           // 8. wheelCircumferenceInfo = null (0 = null)
+            dest.writeInt(0)           // 9. shiftingInfo = null (0 = null)
+        }
+        if (nonNullLightMode) {
+            dest.writeInt(1)           // 10. lightMode present
+            dest.writeString("STEADY4")
+        } else {
+            dest.writeInt(0)           // 10. lightMode = null (0 = null!)
+        }
         dest.writeInt(0)               // 11. autoLightControl = null
         dest.writeInt(0)               // 12. ctfOffset = null
         dest.writeInt(3)               // 13. priority = 3
         dest.writeInt(if (nullFuncAsNeg) -1 else 0) // 14. functionSets = null
-        dest.writeString(null)         // 15. axsPrimarySerial = null
+        dest.writeString(if (probeAxs) "PROBE_AXS" else null) // 15. axsPrimarySerial
         dest.writeInt(0)               // 16. alerts (empty)
         if (nullTireAsParcelable) dest.writeString(null) else dest.writeInt(0) // 17. tirePressureAlerts = null
     }
@@ -178,23 +196,38 @@ class KarooLightControl(private val context: Context) {
                 return true
             }
         }
-        val variants = listOf(false to false, true to false, false to true, true to true)
-        for ((nullInfo, nullConn) in variants) {
+        data class Variant(
+            val label: String,
+            val nullTire: Boolean,
+            val nullFunc: Boolean,
+            val probeAxs: Boolean = false,
+            val nonNullLightMode: Boolean = false,
+            val negWheelShift: Boolean = false
+        )
+        val variants = listOf(
+            Variant("probeAxs", false, false, probeAxs = true),
+            Variant("lightModeSteady4", false, false, nonNullLightMode = true),
+            Variant("lightModeSteady4_tireNeg", true, false, nonNullLightMode = true),
+            Variant("lightModeSteady4_funcNeg", false, true, nonNullLightMode = true),
+            Variant("lightModeSteady4_bothNeg", true, true, nonNullLightMode = true),
+            Variant("negWheelShift_probeAxs", false, false, probeAxs = true, negWheelShift = true),
+        )
+        for (v in variants) {
             val d = Parcel.obtain()
             val r = Parcel.obtain()
             try {
                 val desc = binder.interfaceDescriptor ?: LIGHT_CMD_DESCRIPTOR
                 d.writeInterfaceToken(desc)
-                d.writeString("probe-dev-$deviceId-$nullInfo-$nullConn")
+                d.writeString("probe-dev-$deviceId-${v.label}")
                 d.writeInt(1)
-                writeFullDeviceParcel(d, deviceId, nullInfo, nullConn)
+                writeFullDeviceParcel(d, deviceId, v.nullTire, v.nullFunc, v.probeAxs, v.nonNullLightMode, v.negWheelShift)
                 d.writeStrongBinder(dummyListener)
                 binder.transact(TX_REGISTER_LIGHT_PARAMS, d, r, 0)
                 r.readException()
-                Log.d(TAG, "SUCCESS Device parcel variant nullInfo=$nullInfo nullConn=$nullConn!")
-                return nullInfo to nullConn
+                Log.d(TAG, "SUCCESS Device parcel variant ${v.label}!")
+                return v.nullTire to v.nullFunc
             } catch (e: Exception) {
-                Log.d(TAG, "Variant nullInfo=$nullInfo nullConn=$nullConn failed: ${e.message}")
+                Log.d(TAG, "Variant ${v.label} failed: ${e.message}")
             } finally {
                 d.recycle()
                 r.recycle()
