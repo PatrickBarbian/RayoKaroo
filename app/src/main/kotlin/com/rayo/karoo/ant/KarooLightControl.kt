@@ -320,44 +320,25 @@ class KarooLightControl(private val context: Context) {
         }
 
         val descriptor = binder.interfaceDescriptor ?: LIGHT_CMD_DESCRIPTOR
-        val modes = listOf("devMode_bundleParcel", "devMode_only", "devMode_directMode", "strMode_dev", "devNull_bundleNull")
+        val keys = listOf("value", "lightMode", "light_mode", "mode", "data", "command", "state", "light")
+        val modes = listOf("allParcelKeys", "allStringKeys")
         for (variant in modes) {
             val data = Parcel.obtain()
             val reply = Parcel.obtain()
             try {
                 data.writeInterfaceToken(descriptor)
                 data.writeString(deviceId)
-                when (variant) {
-                    "devMode_bundleParcel" -> {
-                        data.writeInt(1)
-                        writeFullDeviceParcel(data, deviceId, modeName)
-                        val b = Bundle()
-                        b.classLoader = lightMode.javaClass.classLoader
-                        b.putParcelable("value", lightMode)
-                        data.writeInt(1)
-                        b.writeToParcel(data, 0)
-                    }
-                    "devMode_only" -> {
-                        data.writeInt(1)
-                        writeFullDeviceParcel(data, deviceId, modeName)
-                    }
-                    "devMode_directMode" -> {
-                        data.writeInt(1)
-                        writeFullDeviceParcel(data, deviceId, modeName)
-                        data.writeInt(1)
-                        lightMode.writeToParcel(data, 0)
-                    }
-                    "strMode_dev" -> {
-                        data.writeString(modeName)
-                        data.writeInt(1)
-                        writeFullDeviceParcel(data, deviceId, modeName)
-                    }
-                    "devNull_bundleNull" -> {
-                        data.writeInt(1)
-                        writeFullDeviceParcel(data, deviceId, null)
-                        data.writeInt(0)
-                    }
+                data.writeInt(1)
+                writeFullDeviceParcel(data, deviceId, null)
+                val b = Bundle()
+                if (variant == "allParcelKeys") {
+                    b.classLoader = lightMode.javaClass.classLoader
+                    for (k in keys) b.putParcelable(k, lightMode)
+                } else {
+                    for (k in keys) b.putString(k, modeName)
                 }
+                data.writeInt(1)
+                b.writeToParcel(data, 0)
                 binder.transact(TX_SET_LIGHT_MODE, data, reply, 0)
                 reply.readException()
                 Log.d(TAG, "executeSetLightMode($deviceId, $modeName) succeeded via $variant!")
