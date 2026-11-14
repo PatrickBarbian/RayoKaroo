@@ -320,35 +320,43 @@ class KarooLightControl(private val context: Context) {
         }
 
         val descriptor = binder.interfaceDescriptor ?: LIGHT_CMD_DESCRIPTOR
-        val keys = listOf("value", "lightMode", "light_mode", "mode", "data", "command", "state", "light")
-        val compCandidates = listOf("PROBE_COMP", "REAR", "TAILLIGHT", "LIGHT", "BIKE_LIGHT", "PRIMARY", "NONE", "UNKNOWN")
-        for (comp in compCandidates) {
-            val data = Parcel.obtain()
-            val reply = Parcel.obtain()
-            try {
-                data.writeInterfaceToken(descriptor)
-                data.writeString(deviceId)
-                data.writeInt(1)
-                writeFullDeviceParcel(data, deviceId, null)
-                val b = Bundle()
-                b.classLoader = lightMode.javaClass.classLoader
-                for (k in keys) b.putParcelable(k, lightMode)
-                b.putString("component", comp)
-                b.putString("componentType", comp)
-                data.writeInt(1)
-                b.writeToParcel(data, 0)
-                binder.transact(TX_SET_LIGHT_MODE, data, reply, 0)
-                reply.readException()
-                Log.d(TAG, "executeSetLightMode($deviceId, $modeName) succeeded via comp=$comp!")
-                lastCommandedMode[deviceId] = modeName
-                _actualModes.update { it + (deviceId to modeName) }
-                onStateChanged?.invoke()
-                return true
-            } catch (e: Exception) {
-                Log.d(TAG, "executeSetLightMode($deviceId, $modeName) comp=$comp failed: ${e.message}")
-            } finally {
-                data.recycle()
-                reply.recycle()
+        val strKeys = listOf("mode", "lightMode", "light_mode", "command", "action", "type", "data", "state", "light", "source")
+        val compCandidates = listOf("REAR", "TAILLIGHT", "LIGHT", "BIKE_LIGHT", "PRIMARY", "NONE", "UNKNOWN")
+        val variants = listOf("parcelValue_strOthers", "allStrings")
+        for (variant in variants) {
+            for (comp in compCandidates) {
+                val data = Parcel.obtain()
+                val reply = Parcel.obtain()
+                try {
+                    data.writeInterfaceToken(descriptor)
+                    data.writeString(deviceId)
+                    data.writeInt(1)
+                    writeFullDeviceParcel(data, deviceId, null)
+                    val b = Bundle()
+                    if (variant == "parcelValue_strOthers") {
+                        b.classLoader = lightMode.javaClass.classLoader
+                        b.putParcelable("value", lightMode)
+                    } else {
+                        b.putString("value", modeName)
+                    }
+                    for (k in strKeys) b.putString(k, modeName)
+                    b.putString("component", comp)
+                    b.putString("componentType", comp)
+                    data.writeInt(1)
+                    b.writeToParcel(data, 0)
+                    binder.transact(TX_SET_LIGHT_MODE, data, reply, 0)
+                    reply.readException()
+                    Log.d(TAG, "executeSetLightMode($deviceId, $modeName) succeeded via $variant comp=$comp!")
+                    lastCommandedMode[deviceId] = modeName
+                    _actualModes.update { it + (deviceId to modeName) }
+                    onStateChanged?.invoke()
+                    return true
+                } catch (e: Exception) {
+                    Log.d(TAG, "executeSetLightMode($deviceId, $modeName) $variant comp=$comp failed: ${e.message}")
+                } finally {
+                    data.recycle()
+                    reply.recycle()
+                }
             }
         }
         Log.e(TAG, "executeSetLightMode($deviceId, $modeName) all variants failed")
