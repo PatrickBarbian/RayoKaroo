@@ -132,7 +132,7 @@ class KarooLightControl(private val context: Context) {
         }
     }
 
-    private fun writeFullDeviceParcel(dest: Parcel, uid: String, lightModeName: String? = null) {
+    private fun writeFullDeviceParcel(dest: Parcel, uid: String, lightModeName: String? = null, withBikeLightDataType: Boolean = false) {
         dest.writeString(uid) // 1. uid
         // 2. info via writeParcelable -> class name + DeviceInfo fields
         dest.writeString("io.hammerhead.datamodels.timeseriesData.models.DeviceInfo")
@@ -144,7 +144,12 @@ class KarooLightControl(private val context: Context) {
         dest.writeString(null)         // manufacturerInfo = null (readParcelable)
         dest.writeInt(0)               // componentInfo = null
         // 3..17 Device fields
-        dest.writeInt(0)               // 3. supportedDataTypes (empty)
+        if (withBikeLightDataType) {
+            dest.writeInt(1)
+            dest.writeString("DataTypeBikeLight")
+        } else {
+            dest.writeInt(0)           // 3. supportedDataTypes (empty)
+        }
         dest.writeInt(0)               // 4. blockedDataTypes (empty)
         dest.writeInt(1)               // 5. isEnabled = true
         dest.writeInt(1)               // 6. isConnectedAtLeastOnce = true
@@ -320,43 +325,46 @@ class KarooLightControl(private val context: Context) {
         }
 
         val descriptor = binder.interfaceDescriptor ?: LIGHT_CMD_DESCRIPTOR
-        val strKeys = listOf("mode", "lightMode", "light_mode", "command", "action", "type", "data", "state", "light", "source")
-        val compCandidates = listOf("REAR", "TAILLIGHT", "LIGHT", "BIKE_LIGHT", "PRIMARY", "NONE", "UNKNOWN")
-        val variants = listOf("parcelValue_strOthers", "allStrings")
-        for (variant in variants) {
-            for (comp in compCandidates) {
-                val data = Parcel.obtain()
-                val reply = Parcel.obtain()
-                try {
-                    data.writeInterfaceToken(descriptor)
-                    data.writeString(deviceId)
-                    data.writeInt(1)
-                    writeFullDeviceParcel(data, deviceId, null)
-                    val b = Bundle()
-                    if (variant == "parcelValue_strOthers") {
-                        b.classLoader = lightMode.javaClass.classLoader
-                        b.putParcelable("value", lightMode)
-                    } else {
-                        b.putString("value", modeName)
-                    }
-                    for (k in strKeys) b.putString(k, modeName)
-                    b.putString("component", comp)
-                    b.putString("componentType", comp)
-                    data.writeInt(1)
-                    b.writeToParcel(data, 0)
-                    binder.transact(TX_SET_LIGHT_MODE, data, reply, 0)
-                    reply.readException()
-                    Log.d(TAG, "executeSetLightMode($deviceId, $modeName) succeeded via $variant comp=$comp!")
-                    lastCommandedMode[deviceId] = modeName
-                    _actualModes.update { it + (deviceId to modeName) }
-                    onStateChanged?.invoke()
-                    return true
-                } catch (e: Exception) {
-                    Log.d(TAG, "executeSetLightMode($deviceId, $modeName) $variant comp=$comp failed: ${e.message}")
-                } finally {
-                    data.recycle()
-                    reply.recycle()
-                }
+        val strKeys = listOf(
+            "mode", "lightMode", "light_mode", "command", "action", "type", "data", "state", "light", "source",
+            "key", "name", "status", "beam", "level", "target", "reason", "lightState", "light_state", "cmd", "event"
+        )
+        data class TryCase(val label: String, val arg0: String, val withDataType: Boolean)
+        val cases = listOf(
+            TryCase("extKeys", deviceId, false),
+            TryCase("withDataType", deviceId, true),
+            TryCase("listenerIdArg0", "light-params-$deviceId", false),
+        )
+        for (c in cases) {
+            val data = Parcel.obtain()
+            val reply = Parcel.obtain()
+            try {
+                data.writeInterfaceToken(descriptor)
+                data.writeString(c.arg0)
+                data.writeInt(1)
+                writeFullDeviceParcel(data, deviceId, null, c.withDataType)
+                val b = Bundle()
+                b.classLoader = lightMode.javaClass.classLoader
+                b.putParcelable("value", lightMode)
+                for (k in strKeys) b.putString(k, modeName)
+                b.putString("component", "REAR")
+                b.putString("componentType", "REAR")
+                b.putString("deviceId", deviceId)
+                b.putString("uid", deviceId)
+                data.writeInt(1)
+                b.writeToParcel(data, 0)
+                binder.transact(TX_SET_LIGHT_MODE, data, reply, 0)
+                reply.readException()
+                Log.d(TAG, "executeSetLightMode($deviceId, $modeName) succeeded via ${c.label}!")
+                lastCommandedMode[deviceId] = modeName
+                _actualModes.update { it + (deviceId to modeName) }
+                onStateChanged?.invoke()
+                return true
+            } catch (e: Exception) {
+                Log.d(TAG, "executeSetLightMode($deviceId, $modeName) ${c.label} failed: ${e.message}")
+            } finally {
+                data.recycle()
+                reply.recycle()
             }
         }
         Log.e(TAG, "executeSetLightMode($deviceId, $modeName) all variants failed")
@@ -479,6 +487,7 @@ class KarooLightControl(private val context: Context) {
             binder.transact(TX_REGISTER_LIGHT_PARAMS, callData, callReply, 0)
             callReply.readException()
             registeredListeners.add(listenerId)
+            Log.d(TAG, "Registered light parameters listener for $deviceId")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to register light parameters for $deviceId", e)
         } finally {
