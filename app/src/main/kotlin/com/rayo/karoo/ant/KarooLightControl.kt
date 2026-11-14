@@ -327,13 +327,13 @@ class KarooLightControl(private val context: Context) {
         val descriptor = binder.interfaceDescriptor ?: LIGHT_CMD_DESCRIPTOR
         val strKeys = listOf(
             "mode", "lightMode", "light_mode", "command", "action", "type", "data", "state", "light", "source",
-            "key", "name", "status", "beam", "level", "target", "reason", "lightState", "light_state", "cmd", "event"
+            "key", "name", "status", "beam", "level", "target", "reason", "lightState", "light_state", "cmd", "event",
+            "modeName", "mode_name", "newMode", "new_mode", "targetMode", "target_mode",
+            "requestedMode", "requested_mode", "desiredMode", "desired_mode", "lightModeName", "light_mode_name"
         )
         data class TryCase(val label: String, val arg0: String, val parcelKeys: Boolean)
         val cases = listOf(
-            TryCase("listenerIdArg0", "light-params-$deviceId", true),
-            TryCase("deviceIdArg0_parcelKeys", deviceId, true),
-            TryCase("emptyArg0", "", true),
+            TryCase("extModeKeys", deviceId, true),
         )
         for (c in cases) {
             val data = Parcel.obtain()
@@ -391,6 +391,7 @@ class KarooLightControl(private val context: Context) {
         val listenerBinder = object : Binder() {
             init { attachInterface(iface, LISTENER_DESCRIPTOR) }
             override fun onTransact(code: Int, data: Parcel, reply: Parcel?, flags: Int): Boolean {
+                Log.d(TAG, "lightParamsListener.onTransact code=$code for $deviceId")
                 if (code in 1..16777215) data.enforceInterface(LISTENER_DESCRIPTOR)
                 when (code) {
                     1 -> {
@@ -461,6 +462,7 @@ class KarooLightControl(private val context: Context) {
         val listenerBinder = object : Binder() {
             init { attachInterface(iface, LISTENER_DESCRIPTOR) }
             override fun onTransact(code: Int, data: Parcel, reply: Parcel?, flags: Int): Boolean {
+                Log.d(TAG, "lightParamsListener.onTransact code=$code for $deviceId")
                 if (code in 1..16777215) data.enforceInterface(LISTENER_DESCRIPTOR)
                 when (code) {
                     1 -> {
