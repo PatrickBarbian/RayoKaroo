@@ -14,8 +14,6 @@ class RayoActionReceiver : BroadcastReceiver() {
             when (action) {
                 RayoExtension.ACTION_TOGGLE_LIGHT -> ext.toggleLight()
                 RayoExtension.ACTION_CYCLE_PROFILE -> ext.cycleProfile()
-                RayoExtension.ACTION_TOGGLE_ANT_LIGHT -> ext.toggleAntLight()
-                RayoExtension.ACTION_CYCLE_ANT_MODE -> ext.cycleAntMode()
             }
         } else if (context != null) {
             Log.d("RayoActionReceiver", "RayoExtension.instance is null; starting service for action: $action")

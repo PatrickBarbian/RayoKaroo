@@ -89,77 +89,7 @@
                 android:textColor="#FFFFFF" />
         </LinearLayout>
 
-        <!-- 2. LEZYNE RADAR / ANT+ SECTION -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:text="@string/section_ant"
-            android:textColor="#3875F6"
-            android:textSize="14sp"
-            android:textStyle="bold" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:background="@color/bg_card"
-            android:orientation="vertical"
-            android:padding="14dp">
-
-            <TextView
-                android:id="@+id/tvAntDeviceStatus"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/no_ant_lights"
-                android:textColor="@color/text_primary"
-                android:textSize="13sp"
-                android:textStyle="bold" />
-
-            <Switch
-                android:id="@+id/swStvoMode"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:text="@string/stvo_mode_title"
-                android:textColor="@color/text_primary"
-                android:textSize="13sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:text="@string/stvo_mode_desc"
-                android:textColor="@color/text_secondary"
-                android:textSize="11sp" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:text="@string/ant_default_mode_title"
-                android:textColor="@color/text_secondary"
-                android:textSize="11sp"
-                android:textStyle="bold" />
-
-            <Spinner
-                android:id="@+id/spnAntDefaultMode"
-                android:layout_width="match_parent"
-                android:layout_height="44dp"
-                android:layout_marginTop="2dp" />
-
-            <Button
-                android:id="@+id/btnTestAntToggle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:backgroundTint="#3875F6"
-                android:text="@string/test_ant_toggle"
-                android:textColor="#FFFFFF" />
-        </LinearLayout>
-
-        <!-- 3. RADAR THREAT REACTION SECTION -->
+        <!-- 2. RADAR THREAT REACTION SECTION -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -195,34 +125,18 @@
                 android:textColor="@color/text_secondary"
                 android:textSize="11sp" />
 
-            <!-- Yellow Threat Mode -->
+            <!-- Rayo Profile on Radar Threat -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
-                android:text="@string/radar_threat_yellow_title"
+                android:text="Rayo-Profil bei Fahrzeug-Warnung"
                 android:textColor="@color/text_secondary"
                 android:textSize="11sp"
                 android:textStyle="bold" />
 
             <Spinner
-                android:id="@+id/spnRadarYellowMode"
-                android:layout_width="match_parent"
-                android:layout_height="44dp"
-                android:layout_marginTop="2dp" />
-
-            <!-- Red Threat Mode -->
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:text="@string/radar_threat_red_title"
-                android:textColor="@color/text_secondary"
-                android:textSize="11sp"
-                android:textStyle="bold" />
-
-            <Spinner
-                android:id="@+id/spnRadarRedMode"
+                android:id="@+id/spnRadarRayoProfile"
                 android:layout_width="match_parent"
                 android:layout_height="44dp"
                 android:layout_marginTop="2dp" />
@@ -242,26 +156,6 @@
                 android:layout_width="match_parent"
                 android:layout_height="44dp"
                 android:layout_marginTop="2dp" />
-
-            <!-- StVO Warn Flash -->
-            <Switch
-                android:id="@+id/swStvoWarnFlash"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:checked="true"
-                android:text="@string/stvo_warn_flash_title"
-                android:textColor="@color/text_primary"
-                android:textSize="13sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:text="@string/stvo_warn_flash_desc"
-                android:textColor="@color/text_secondary"
-                android:textSize="11sp" />
 
             <!-- Radar Simulator -->
             <View
@@ -341,22 +235,6 @@
                 android:layout_height="44dp"
                 android:layout_marginTop="2dp" />
 
-            <!-- Brake Mode -->
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:text="@string/brake_mode_title"
-                android:textColor="@color/text_secondary"
-                android:textSize="11sp"
-                android:textStyle="bold" />
-
-            <Spinner
-                android:id="@+id/spnBrakeMode"
-                android:layout_width="match_parent"
-                android:layout_height="44dp"
-                android:layout_marginTop="2dp" />
-
             <!-- Brake Hold Time -->
             <TextView
                 android:layout_width="wrap_content"
@@ -422,22 +300,6 @@
 
             <Spinner
                 android:id="@+id/spnSpeedThreshold"
-                android:layout_width="match_parent"
-                android:layout_height="44dp"
-                android:layout_marginTop="2dp" />
-
-            <!-- Speed Mode -->
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:text="@string/speed_mode_title"
-                android:textColor="@color/text_secondary"
-                android:textSize="11sp"
-                android:textStyle="bold" />
-
-            <Spinner
-                android:id="@+id/spnSpeedMode"
                 android:layout_width="match_parent"
                 android:layout_height="44dp"
                 android:layout_marginTop="2dp" />
