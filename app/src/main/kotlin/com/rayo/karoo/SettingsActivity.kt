@@ -347,8 +347,6 @@ class SettingsActivity : AppCompatActivity() {
             tvPairedStatus.setTextColor(0xFFFFFFFF.toInt())
         }
 
-        swStvoMode.isChecked = RayoExtension.instance?.isStvoModeActive() ?: prefs.getBoolean(RayoExtension.PREF_STVO_MODE, false)
-        swStvoWarnFlash.isChecked = prefs.getBoolean(RayoExtension.PREF_STVO_WARN_FLASH, true)
         swRadarThreat.isChecked = prefs.getBoolean(RayoExtension.PREF_RADAR_THREAT, true)
         swBrakeEnabled.isChecked = prefs.getBoolean(RayoExtension.PREF_BRAKE_ENABLED, true)
         swSpeedAdaptive.isChecked = prefs.getBoolean(RayoExtension.PREF_SPEED_ADAPTIVE_ENABLED, false)
