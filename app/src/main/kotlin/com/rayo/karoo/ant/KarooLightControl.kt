@@ -329,11 +329,11 @@ class KarooLightControl(private val context: Context) {
             "mode", "lightMode", "light_mode", "command", "action", "type", "data", "state", "light", "source",
             "key", "name", "status", "beam", "level", "target", "reason", "lightState", "light_state", "cmd", "event"
         )
-        data class TryCase(val label: String, val arg0: String, val withDataType: Boolean)
+        data class TryCase(val label: String, val arg0: String, val parcelKeys: Boolean)
         val cases = listOf(
-            TryCase("extKeys", deviceId, false),
-            TryCase("withDataType", deviceId, true),
-            TryCase("listenerIdArg0", "light-params-$deviceId", false),
+            TryCase("listenerIdArg0", "light-params-$deviceId", true),
+            TryCase("deviceIdArg0_parcelKeys", deviceId, true),
+            TryCase("emptyArg0", "", true),
         )
         for (c in cases) {
             val data = Parcel.obtain()
@@ -342,11 +342,17 @@ class KarooLightControl(private val context: Context) {
                 data.writeInterfaceToken(descriptor)
                 data.writeString(c.arg0)
                 data.writeInt(1)
-                writeFullDeviceParcel(data, deviceId, null, c.withDataType)
+                writeFullDeviceParcel(data, deviceId, null, false)
                 val b = Bundle()
                 b.classLoader = lightMode.javaClass.classLoader
                 b.putParcelable("value", lightMode)
-                for (k in strKeys) b.putString(k, modeName)
+                if (c.parcelKeys) {
+                    b.putParcelable("lightMode", lightMode)
+                    b.putParcelable("mode", lightMode)
+                }
+                for (k in strKeys) {
+                    if (!c.parcelKeys || (k != "lightMode" && k != "mode")) b.putString(k, modeName)
+                }
                 b.putString("component", "REAR")
                 b.putString("componentType", "REAR")
                 b.putString("deviceId", deviceId)
@@ -426,7 +432,7 @@ class KarooLightControl(private val context: Context) {
         try {
             val descriptor = binder.interfaceDescriptor ?: SENSOR_DESCRIPTOR
             callData.writeInterfaceToken(descriptor)
-            callData.writeString(listenerId)
+            callData.writeString(deviceId)
             callData.writeInt(1)
             device.writeToParcel(callData, 0)
             callData.writeStrongBinder(listenerBinder)
@@ -480,7 +486,7 @@ class KarooLightControl(private val context: Context) {
         try {
             val descriptor = binder.interfaceDescriptor ?: LIGHT_CMD_DESCRIPTOR
             callData.writeInterfaceToken(descriptor)
-            callData.writeString(listenerId)
+            callData.writeString(deviceId)
             callData.writeInt(1)
             device.writeToParcel(callData, 0)
             callData.writeStrongBinder(listenerBinder)
@@ -506,6 +512,7 @@ class KarooLightControl(private val context: Context) {
                 val modeName = parcel.readString()
                 val locationName = parcel.readString()
                 val modesCount = parcel.readInt()
+                Log.d(TAG, "parseLightParameters($deviceId): mode=$modeName loc=$locationName count=$modesCount")
                 val modes = mutableSetOf<String>()
                 repeat(modesCount) {
                     val name = parcel.readString()
