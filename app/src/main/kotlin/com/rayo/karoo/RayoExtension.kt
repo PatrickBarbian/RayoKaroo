@@ -63,6 +63,12 @@ class RayoExtension : KarooExtension("rayo", "1.0.0") {
         const val PREF_RADAR_HOLD_SEC = "radar_hold_sec"
         const val PREF_SIMULATE_RADAR = "simulate_radar"
 
+        // Ambient Light Sensor settings
+        const val PREF_LIGHT_SENSOR_ENABLED = "light_sensor_enabled"
+        const val PREF_LIGHT_SENSOR_THRESHOLD = "light_sensor_threshold"
+        const val PREF_LIGHT_SENSOR_DARK_PROFILE = "light_sensor_dark_profile"
+        const val PREF_LIGHT_SENSOR_BRIGHT_ACTION = "light_sensor_bright_action"
+
         // G-Brake settings
         const val PREF_BRAKE_ENABLED = "brake_enabled"
         const val PREF_BRAKE_THRESHOLD = "brake_threshold"
@@ -108,19 +114,33 @@ class RayoExtension : KarooExtension("rayo", "1.0.0") {
     @Volatile var currentSpeedKmh: Float = 0f
         private set
 
+    @Volatile var currentLux: Float = -1f
+        private set
+
+    @Volatile var isDarkEnvironment: Boolean = false
+        private set
+
+    var hasLightSensor: Boolean = false
+        private set
+
     private var preThreatRayoProfile: Int? = null
+    private var preThreatRayoWasOn: Boolean? = null
     private var threatHoldJob: Job? = null
     private var brakeHoldJob: Job? = null
     private var radarSimulatorJob: Job? = null
+    private var lightSensorDebounceJob: Job? = null
+    private var pendingDarkState: Boolean? = null
 
     var onSimulationStep: ((threatLevel: Int, label: String) -> Unit)? = null
+    var onLightSensorUpdate: ((lux: Float, isDark: Boolean) -> Unit)? = null
 
     private var radarConsumerId: String? = null
     private var speedConsumerId: String? = null
 
-    // G-Sensor Accelerometer
+    // G-Sensor & Light Sensor
     private var sensorManager: SensorManager? = null
     private var accelListener: SensorEventListener? = null
+    private var lightSensorListener: SensorEventListener? = null
 
     override val types by lazy {
         listOf(
@@ -135,8 +155,9 @@ class RayoExtension : KarooExtension("rayo", "1.0.0") {
 
         karooSystem = KarooSystemService(this)
 
-        // Setup G-Sensor Accelerometer for G-Force Bremslicht
+        // Setup G-Sensor Accelerometer for G-Force Bremslicht & Ambient Light Sensor
         setupGForceBrakeSensor()
+        setupAmbientLightSensor()
 
         // BLE Manager for Rayo
         bleManager = BleManager(this, object : BleManager.Listener {
@@ -292,6 +313,101 @@ class RayoExtension : KarooExtension("rayo", "1.0.0") {
         sensorManager?.registerListener(accelListener, accel, SensorManager.SENSOR_DELAY_GAME)
     }
 
+    // --- AMBIENT LIGHT SENSOR (KAROO 3 TYPE_LIGHT) ---
+
+    private fun setupAmbientLightSensor() {
+        if (sensorManager == null) {
+            sensorManager = getSystemService(Context.SENSOR_SERVICE) as? SensorManager
+        }
+        val lightSensor = sensorManager?.getDefaultSensor(Sensor.TYPE_LIGHT)
+        hasLightSensor = lightSensor != null
+        if (lightSensor == null) {
+            Log.w(TAG, "No ambient light sensor (TYPE_LIGHT) found on this device.")
+            return
+        }
+
+        lightSensorListener = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent?) {
+                if (event == null || event.sensor.type != Sensor.TYPE_LIGHT) return
+                val lux = event.values[0]
+                currentLux = lux
+                onLightSensorUpdate?.invoke(lux, isDarkEnvironment)
+
+                val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                if (!prefs.getBoolean(PREF_LIGHT_SENSOR_ENABLED, false)) return
+
+                val darkThreshold = prefs.getFloat(PREF_LIGHT_SENSOR_THRESHOLD, 150f)
+                val brightThreshold = darkThreshold * 2.0f
+
+                val targetDark: Boolean? = when {
+                    lux < darkThreshold && !isDarkEnvironment -> true
+                    lux >= brightThreshold && isDarkEnvironment -> false
+                    else -> null
+                }
+
+                if (targetDark == null) {
+                    if ((isDarkEnvironment && lux < brightThreshold) || (!isDarkEnvironment && lux >= darkThreshold)) {
+                        lightSensorDebounceJob?.cancel()
+                        lightSensorDebounceJob = null
+                        pendingDarkState = null
+                    }
+                    return
+                }
+
+                if (pendingDarkState == targetDark && lightSensorDebounceJob?.isActive == true) {
+                    return
+                }
+
+                pendingDarkState = targetDark
+                lightSensorDebounceJob?.cancel()
+                val delayMs = if (targetDark) 3000L else 5000L
+                lightSensorDebounceJob = scope.launch {
+                    delay(delayMs)
+                    isDarkEnvironment = targetDark
+                    pendingDarkState = null
+                    onLightSensorUpdate?.invoke(currentLux, isDarkEnvironment)
+                    applyLightSensorState(targetDark)
+                }
+            }
+
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+        }
+
+        sensorManager?.registerListener(lightSensorListener, lightSensor, SensorManager.SENSOR_DELAY_NORMAL)
+    }
+
+    private fun applyLightSensorState(isDark: Boolean) {
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        if (!prefs.getBoolean(PREF_LIGHT_SENSOR_ENABLED, false)) return
+        if (!bleManager.isConnected || isRadarThreatActive) return
+
+        if (isDark) {
+            val darkProfile = prefs.getInt(PREF_LIGHT_SENSOR_DARK_PROFILE, 0).coerceIn(0, 3)
+            if (!bleManager.isLightOn) {
+                bleManager.setLight(true)
+            }
+            if (bleManager.currentMode != darkProfile) {
+                bleManager.selectProfile(darkProfile)
+            }
+        } else {
+            val brightAction = prefs.getInt(PREF_LIGHT_SENSOR_BRIGHT_ACTION, -1)
+            if (brightAction < 0) {
+                if (bleManager.isLightOn) {
+                    bleManager.setLight(false)
+                }
+            } else {
+                val targetProfile = brightAction.coerceIn(0, 3)
+                if (!bleManager.isLightOn) {
+                    bleManager.setLight(true)
+                }
+                if (bleManager.currentMode != targetProfile) {
+                    bleManager.selectProfile(targetProfile)
+                }
+            }
+        }
+        updateAllRayoDataFields()
+    }
+
     private fun applyBrakeLight() {
         if (isRadarThreatActive) return
     }
@@ -360,11 +476,15 @@ class RayoExtension : KarooExtension("rayo", "1.0.0") {
                     val fallbackProfile = prefs.getInt(PREF_DEFAULT_PROFILE, 0)
                     val currentProfile = if (bleManager.currentMode in 0..3) bleManager.currentMode else fallbackProfile
                     preThreatRayoProfile = currentProfile
+                    preThreatRayoWasOn = bleManager.isLightOn
                     val targetProfile = prefs.getInt(PREF_RADAR_RAYO_PROFILE, 1).coerceIn(0, 3)
+                    if (!bleManager.isLightOn) {
+                        bleManager.setLight(true)
+                    }
                     if (bleManager.currentMode != targetProfile) {
                         bleManager.selectProfile(targetProfile)
-                        updateAllRayoDataFields()
                     }
+                    updateAllRayoDataFields()
                 }
             }
         } else {
@@ -381,13 +501,19 @@ class RayoExtension : KarooExtension("rayo", "1.0.0") {
                 currentThreatLevel = 0
                 if (threatReactionEnabled && bleManager.isConnected) {
                     val restoreProfile = preThreatRayoProfile
+                    val wasOn = preThreatRayoWasOn
                     preThreatRayoProfile = null
+                    preThreatRayoWasOn = null
                     if (restoreProfile != null && bleManager.currentMode != restoreProfile) {
                         bleManager.selectProfile(restoreProfile)
-                        updateAllRayoDataFields()
                     }
+                    if (wasOn == false && bleManager.isLightOn) {
+                        bleManager.setLight(false)
+                    }
+                    updateAllRayoDataFields()
                 } else {
                     preThreatRayoProfile = null
+                    preThreatRayoWasOn = null
                 }
                 threatHoldJob = null
             }
@@ -764,6 +890,8 @@ class RayoExtension : KarooExtension("rayo", "1.0.0") {
     override fun onDestroy() {
         stopRadarSimulation()
         accelListener?.let { sensorManager?.unregisterListener(it) }
+        lightSensorListener?.let { sensorManager?.unregisterListener(it) }
+        lightSensorDebounceJob?.cancel()
         radarConsumerId?.let { karooSystem.removeConsumer(it) }
         speedConsumerId?.let { karooSystem.removeConsumer(it) }
         scope.cancel()

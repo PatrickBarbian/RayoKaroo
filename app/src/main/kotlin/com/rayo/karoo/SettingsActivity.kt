@@ -34,6 +34,13 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var spnRadarHoldSec: Spinner
     private lateinit var swRadarSim: Switch
 
+    // 3. Ambient Light Sensor Views
+    private lateinit var tvLightSensorStatus: TextView
+    private lateinit var swLightSensorEnabled: Switch
+    private lateinit var spnLightSensorThreshold: Spinner
+    private lateinit var spnLightSensorDarkProfile: Spinner
+    private lateinit var spnLightSensorBrightAction: Spinner
+
     // 3. G-Brake Views
     private lateinit var swBrakeEnabled: Switch
     private lateinit var spnBrakeSensitivity: Spinner
@@ -132,6 +139,12 @@ class SettingsActivity : AppCompatActivity() {
         spnRadarHoldSec = findViewById(R.id.spnRadarHoldSec)
         swRadarSim = findViewById(R.id.swRadarSim)
 
+        tvLightSensorStatus = findViewById(R.id.tvLightSensorStatus)
+        swLightSensorEnabled = findViewById(R.id.swLightSensorEnabled)
+        spnLightSensorThreshold = findViewById(R.id.spnLightSensorThreshold)
+        spnLightSensorDarkProfile = findViewById(R.id.spnLightSensorDarkProfile)
+        spnLightSensorBrightAction = findViewById(R.id.spnLightSensorBrightAction)
+
         swBrakeEnabled = findViewById(R.id.swBrakeEnabled)
         spnBrakeSensitivity = findViewById(R.id.spnBrakeSensitivity)
         spnBrakeHoldSec = findViewById(R.id.spnBrakeHoldSec)
@@ -187,6 +200,36 @@ class SettingsActivity : AppCompatActivity() {
                 RayoExtension.instance?.stopRadarSimulation()
                 tvSettingsLog.text = "Radar-Simulator beendet."
             }
+        }
+
+        // Ambient Light Sensor
+        swLightSensorEnabled.isChecked = prefs.getBoolean(RayoExtension.PREF_LIGHT_SENSOR_ENABLED, false)
+        swLightSensorEnabled.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit().putBoolean(RayoExtension.PREF_LIGHT_SENSOR_ENABLED, isChecked).apply()
+        }
+
+        val luxOptions = listOf(50f, 150f, 400f)
+        val luxLabels = listOf("50 lx (Sehr dunkel / Tunnel)", "150 lx (Dämmerung / Wald)", "400 lx (Bewölkt)")
+        spnLightSensorThreshold.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, luxLabels)
+        val savedLux = prefs.getFloat(RayoExtension.PREF_LIGHT_SENSOR_THRESHOLD, 150f)
+        spnLightSensorThreshold.setSelection(luxOptions.indexOf(savedLux).coerceAtLeast(1))
+        spnLightSensorThreshold.onItemSelectedListener = simpleSelectListener { pos ->
+            prefs.edit().putFloat(RayoExtension.PREF_LIGHT_SENSOR_THRESHOLD, luxOptions[pos]).apply()
+        }
+
+        spnLightSensorDarkProfile.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, profiles)
+        spnLightSensorDarkProfile.setSelection(prefs.getInt(RayoExtension.PREF_LIGHT_SENSOR_DARK_PROFILE, 0).coerceIn(0, 3))
+        spnLightSensorDarkProfile.onItemSelectedListener = simpleSelectListener { pos ->
+            prefs.edit().putInt(RayoExtension.PREF_LIGHT_SENSOR_DARK_PROFILE, pos).apply()
+        }
+
+        val brightActions = listOf(-1, 0, 1, 2, 3)
+        val brightLabels = listOf("Licht AUS", "Profil 1", "Profil 2", "Profil 3", "Profil 4")
+        spnLightSensorBrightAction.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, brightLabels)
+        val savedBright = prefs.getInt(RayoExtension.PREF_LIGHT_SENSOR_BRIGHT_ACTION, -1)
+        spnLightSensorBrightAction.setSelection(brightActions.indexOf(savedBright).coerceAtLeast(0))
+        spnLightSensorBrightAction.onItemSelectedListener = simpleSelectListener { pos ->
+            prefs.edit().putInt(RayoExtension.PREF_LIGHT_SENSOR_BRIGHT_ACTION, brightActions[pos]).apply()
         }
 
         // G-Brake Sensitivity
@@ -300,6 +343,15 @@ class SettingsActivity : AppCompatActivity() {
             }
         }
 
+        RayoExtension.instance?.let { ext ->
+            updateLightSensorLabel(ext.hasLightSensor, ext.currentLux, ext.isDarkEnvironment)
+            ext.onLightSensorUpdate = { lux, isDark ->
+                runOnUiThread {
+                    updateLightSensorLabel(ext.hasLightSensor, lux, isDark)
+                }
+            }
+        }
+
         val bm = RayoExtension.instance?.bleManager
         if (bm != null && bm.isConnected) {
             val bat = if (bm.batteryPercent >= 0) " (${bm.batteryPercent}%)" else ""
@@ -322,6 +374,21 @@ class SettingsActivity : AppCompatActivity() {
         super.onPause()
         RayoExtension.instance?.bleManager?.removeListener(bleListener)
         RayoExtension.instance?.onSimulationStep = null
+        RayoExtension.instance?.onLightSensorUpdate = null
+    }
+
+    private fun updateLightSensorLabel(hasSensor: Boolean, lux: Float, isDark: Boolean) {
+        if (!hasSensor) {
+            tvLightSensorStatus.text = "Kein Lichtsensor auf diesem Gerät gefunden"
+            tvLightSensorStatus.setTextColor(0xFFFF2A55.toInt())
+        } else if (lux < 0f) {
+            tvLightSensorStatus.text = "Lichtsensor aktiv — warte auf Messwert..."
+            tvLightSensorStatus.setTextColor(0xFF9E9EA7.toInt())
+        } else {
+            val stateText = if (isDark) "Dunkel" else "Hell"
+            tvLightSensorStatus.text = "Aktuell: ${lux.toInt()} lx ($stateText)"
+            tvLightSensorStatus.setTextColor(if (isDark) 0xFFFFAA00.toInt() else 0xFF00E676.toInt())
+        }
     }
 
     private fun updateTestButtonText(isLightOn: Boolean) {
