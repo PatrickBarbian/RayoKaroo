@@ -1,9 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="bg_dark">#121318</color>
-    <color name="bg_card">#1C1D24</color>
-    <color name="accent_red">#FF2A55</color>
-    <color name="accent_green">#00E676</color>
-    <color name="text_primary">#FFFFFF</color>
-    <color name="text_secondary">#9E9EA7</color>
+    <!-- 60/30/10 Surface Tokens (Light Mode - High Outdoor Contrast) -->
+    <color name="surface_canvas">#F6F7F9</color>
+    <color name="surface_panel">#FFFFFF</color>
+    <color name="surface_card">#FFFFFF</color>
+    <color name="surface_recessed">#ECEEF2</color>
+    <color name="surface_elevated">#FFFFFF</color>
+
+    <!-- 1dp Hairlines -->
+    <color name="border_hairline">#DFE3EA</color>
+    <color name="border_subtle">#ECEEF2</color>
+
+    <!-- Typography -->
+    <color name="text_primary">#111318</color>
+    <color name="text_secondary">#5F6673</color>
+    <color name="text_muted">#8A92A0</color>
+
+    <!-- Single Standout Accent (10%) -->
+    <color name="accent_primary">#E11D48</color>
+    <color name="accent_primary_pressed">#BE123C</color>
+    <color name="accent_on_primary">#FFFFFF</color>
+
+    <!-- Semantic Status Tints -->
+    <color name="status_ok_bg">#EAF7EF</color>
+    <color name="status_ok_fg">#15803D</color>
+    <color name="status_warn_bg">#FEF6E6</color>
+    <color name="status_warn_fg">#B45309</color>
+
+    <!-- Destructive (Soft tint at rest, solid on press) -->
+    <color name="destructive_tint_bg">#FDECEF</color>
+    <color name="destructive_tint_fg">#BE123C</color>
+    <color name="destructive_solid_bg">#DC2626</color>
 </resources>

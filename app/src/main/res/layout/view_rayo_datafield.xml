@@ -3,62 +3,74 @@
     android:id="@+id/layoutDataFieldRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#121318"
+    android:background="@drawable/bg_datafield_card"
     android:gravity="center"
     android:orientation="vertical"
-    android:padding="5dp">
+    android:padding="6dp">
 
-    <!-- Header: App Name & Battery -->
+    <!-- Header: Muted Eyebrow & Tabular Battery -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
-        android:orientation="horizontal">
+        android:orientation="horizontal"
+        android:paddingHorizontal="2dp">
 
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:ellipsize="end"
+            android:letterSpacing="0.08"
+            android:maxLines="1"
             android:text="RAYO"
-            android:textColor="#FF2A55"
-            android:textSize="12sp"
+            android:textColor="#9CA3B0"
+            android:textSize="11sp"
             android:textStyle="bold" />
 
         <TextView
             android:id="@+id/tvBatteryField"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:fontFeatureSettings="tnum"
+            android:maxLines="1"
             android:text="--%"
-            android:textColor="#00E676"
-            android:textSize="12sp"
+            android:textColor="#9CA3B0"
+            android:textSize="11sp"
             android:textStyle="bold" />
     </LinearLayout>
 
-    <!-- Main In-Ride Interactive Button: Light Toggle (Slightly reduced in height, text +50%) -->
+    <!-- Primary In-Ride Focal Button: Light Toggle -->
     <Button
         android:id="@+id/btnToggleLight"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginTop="3dp"
-        android:layout_marginBottom="3dp"
-        android:layout_weight="1.1"
-        android:background="#282A33"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="4dp"
+        android:layout_weight="1.15"
+        android:background="@drawable/bg_datafield_btn_off"
+        android:ellipsize="end"
+        android:maxLines="1"
         android:text="LICHT AUS"
-        android:textColor="#FFFFFF"
-        android:textSize="21sp"
+        android:textAllCaps="false"
+        android:textColor="#F4F5F7"
+        android:textSize="19sp"
         android:textStyle="bold" />
 
-    <!-- Secondary In-Ride Button: Cycle Profile (Enlarged touch area & text size) -->
+    <!-- Secondary Profile Pill -->
     <Button
         android:id="@+id/btnCycleProfile"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginBottom="1dp"
-        android:layout_weight="0.9"
-        android:background="#1F2029"
+        android:layout_weight="0.85"
+        android:background="@drawable/bg_datafield_chip"
+        android:ellipsize="end"
+        android:fontFeatureSettings="tnum"
+        android:maxLines="1"
         android:text="PROFIL 1"
-        android:textColor="#FFFFFF"
-        android:textSize="15sp"
+        android:textAllCaps="false"
+        android:textColor="#9CA3B0"
+        android:textSize="13sp"
         android:textStyle="bold" />
 
 </LinearLayout>

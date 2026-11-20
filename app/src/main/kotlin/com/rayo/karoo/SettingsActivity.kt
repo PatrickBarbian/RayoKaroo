@@ -14,191 +14,210 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import android.view.View
-import android.widget.*
+import android.widget.Button
+import android.widget.Switch
+import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import java.util.Locale
 
 @SuppressLint("MissingPermission")
 class SettingsActivity : AppCompatActivity() {
 
-    // 1. Rayo BLE Views
     private lateinit var tvPairedStatus: TextView
+    private lateinit var btnCommandPalette: Button
     private lateinit var btnScanPair: Button
-    private lateinit var spnDefaultProfile: Spinner
     private lateinit var btnTestToggle: Button
 
-    // 2. Radar Threat Views
+    private lateinit var defProfButtons: List<Button>
     private lateinit var swRadarThreat: Switch
-    private lateinit var spnRadarRayoProfile: Spinner
-    private lateinit var spnRadarHoldSec: Spinner
+    private lateinit var radarProfButtons: List<Button>
+    private lateinit var holdButtons: List<Button>
     private lateinit var swRadarSim: Switch
 
-    // 3. Ambient Light Sensor Views
     private lateinit var tvLightSensorStatus: TextView
     private lateinit var swLightSensorEnabled: Switch
-    private lateinit var spnLightSensorThreshold: Spinner
-    private lateinit var spnLightSensorDarkProfile: Spinner
-    private lateinit var spnLightSensorBrightAction: Spinner
+    private lateinit var luxButtons: List<Button>
+    private lateinit var darkProfButtons: List<Button>
+    private lateinit var brightButtons: List<Button>
 
-    // 3. G-Brake Views
-    private lateinit var swBrakeEnabled: Switch
-    private lateinit var spnBrakeSensitivity: Spinner
-    private lateinit var spnBrakeHoldSec: Spinner
-
-    // 4. Speed-Adaptive Views
-    private lateinit var swSpeedAdaptive: Switch
-    private lateinit var spnSpeedThreshold: Spinner
-
-    // 5. Automation Views
     private lateinit var swAutoStart: Switch
-    private lateinit var spnPauseBehavior: Spinner
-    private lateinit var swInRideAlerts: Switch
-    private lateinit var tvSettingsLog: TextView
+    private lateinit var pauseButtons: List<Button>
+
+    private lateinit var floatingToast: UiMotion.FloatingToastController
 
     private val bluetoothAdapter: BluetoothAdapter? = BluetoothAdapter.getDefaultAdapter()
     private var isScanning = false
     private val handler = Handler(Looper.getMainLooper())
 
+    private val holdValues = listOf(1, 2, 3, 5)
+    private val luxValues = listOf(50f, 150f, 400f)
+    private val brightValues = listOf(-1, 0, 1, 2, 3)
+    private val pauseKeys = listOf("NONE", "OFF")
+
     private val bleListener = object : BleManager.Listener {
         override fun onConnectionStateChange(connected: Boolean, deviceName: String?, mac: String?) {
             runOnUiThread {
+                updateConnectionUi(connected, deviceName, mac)
                 if (connected) {
-                    val bat = RayoExtension.instance?.bleManager?.batteryPercent ?: -1
-                    val batStr = if (bat >= 0) " ($bat%)" else ""
-                    tvPairedStatus.text = "Verbunden: ${deviceName ?: "RAYO"} [$mac]$batStr"
-                    tvPairedStatus.setTextColor(0xFF00E676.toInt())
-                    tvSettingsLog.text = "Rayo verbunden!"
-                    updateTestButtonText(RayoExtension.instance?.bleManager?.isLightOn ?: false)
-                } else {
-                    val savedMac = getSharedPreferences(RayoExtension.PREFS_NAME, Context.MODE_PRIVATE)
-                        .getString(RayoExtension.PREF_MAC, null)
-                    if (!savedMac.isNullOrEmpty()) {
-                        tvPairedStatus.text = "Gekoppelt: $savedMac (getrennt)"
-                        tvPairedStatus.setTextColor(0xFFFFAA00.toInt())
-                    } else {
-                        tvPairedStatus.text = getString(R.string.not_paired)
-                        tvPairedStatus.setTextColor(0xFFFFFFFF.toInt())
-                    }
-                    btnTestToggle.text = "Rayo verbinden & testen"
-                    tvSettingsLog.text = "Rayo nicht verbunden."
+                    floatingToast.show("Rayo verbunden")
                 }
             }
         }
 
         override fun onBatteryUpdate(percent: Int) {
             runOnUiThread {
-                val name = RayoExtension.instance?.bleManager?.connectedDeviceName ?: "RAYO"
-                val mac = RayoExtension.instance?.bleManager?.connectedMac ?: ""
-                tvPairedStatus.text = "Verbunden: $name [$mac] ($percent%)"
+                val bm = RayoExtension.instance?.bleManager
+                if (bm != null && bm.isConnected) {
+                    updateConnectionUi(true, bm.connectedDeviceName, bm.connectedMac)
+                }
             }
         }
 
         override fun onLightStateUpdate(isOn: Boolean) {
-            runOnUiThread {
-                updateTestButtonText(isOn)
-            }
+            runOnUiThread { updateTestButtonText(isOn) }
         }
 
-        override fun onActiveModeUpdate(mode: Int) {
-            runOnUiThread {
-                if (spnDefaultProfile.selectedItemPosition != mode) {
-                    spnDefaultProfile.setSelection(mode)
-                }
-            }
-        }
+        override fun onActiveModeUpdate(mode: Int) {}
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_settings)
 
-        bindViews()
         checkPermissions()
-        loadPreferences()
+        bindViews()
+        setupControls()
 
-        // Ensure background extension service is running
         try {
             startService(Intent(this, RayoExtension::class.java))
         } catch (e: Exception) {
             Log.e("SettingsActivity", "Error starting RayoExtension service", e)
         }
-
-        setupSpinnersAndSwitches()
-        setupClickListeners()
     }
 
     private fun bindViews() {
         tvPairedStatus = findViewById(R.id.tvPairedStatus)
+        btnCommandPalette = findViewById(R.id.btnCommandPalette)
         btnScanPair = findViewById(R.id.btnScanPair)
-        spnDefaultProfile = findViewById(R.id.spnDefaultProfile)
         btnTestToggle = findViewById(R.id.btnTestToggle)
 
+        defProfButtons = listOf(
+            findViewById(R.id.btnDefProf0),
+            findViewById(R.id.btnDefProf1),
+            findViewById(R.id.btnDefProf2),
+            findViewById(R.id.btnDefProf3),
+        )
+
         swRadarThreat = findViewById(R.id.swRadarThreat)
-        spnRadarRayoProfile = findViewById(R.id.spnRadarRayoProfile)
-        spnRadarHoldSec = findViewById(R.id.spnRadarHoldSec)
+        radarProfButtons = listOf(
+            findViewById(R.id.btnRadarProf0),
+            findViewById(R.id.btnRadarProf1),
+            findViewById(R.id.btnRadarProf2),
+            findViewById(R.id.btnRadarProf3),
+        )
+        holdButtons = listOf(
+            findViewById(R.id.btnHold1),
+            findViewById(R.id.btnHold2),
+            findViewById(R.id.btnHold3),
+            findViewById(R.id.btnHold5),
+        )
         swRadarSim = findViewById(R.id.swRadarSim)
 
         tvLightSensorStatus = findViewById(R.id.tvLightSensorStatus)
         swLightSensorEnabled = findViewById(R.id.swLightSensorEnabled)
-        spnLightSensorThreshold = findViewById(R.id.spnLightSensorThreshold)
-        spnLightSensorDarkProfile = findViewById(R.id.spnLightSensorDarkProfile)
-        spnLightSensorBrightAction = findViewById(R.id.spnLightSensorBrightAction)
-
-        swBrakeEnabled = findViewById(R.id.swBrakeEnabled)
-        spnBrakeSensitivity = findViewById(R.id.spnBrakeSensitivity)
-        spnBrakeHoldSec = findViewById(R.id.spnBrakeHoldSec)
-
-        swSpeedAdaptive = findViewById(R.id.swSpeedAdaptive)
-        spnSpeedThreshold = findViewById(R.id.spnSpeedThreshold)
+        luxButtons = listOf(
+            findViewById(R.id.btnLux50),
+            findViewById(R.id.btnLux150),
+            findViewById(R.id.btnLux400),
+        )
+        darkProfButtons = listOf(
+            findViewById(R.id.btnDarkProf0),
+            findViewById(R.id.btnDarkProf1),
+            findViewById(R.id.btnDarkProf2),
+            findViewById(R.id.btnDarkProf3),
+        )
+        brightButtons = listOf(
+            findViewById(R.id.btnBrightOff),
+            findViewById(R.id.btnBrightProf0),
+            findViewById(R.id.btnBrightProf1),
+            findViewById(R.id.btnBrightProf2),
+            findViewById(R.id.btnBrightProf3),
+        )
 
         swAutoStart = findViewById(R.id.swAutoStart)
-        spnPauseBehavior = findViewById(R.id.spnPauseBehavior)
-        swInRideAlerts = findViewById(R.id.swInRideAlerts)
-        tvSettingsLog = findViewById(R.id.tvSettingsLog)
+        pauseButtons = listOf(
+            findViewById(R.id.btnPauseKeep),
+            findViewById(R.id.btnPauseOff),
+        )
+
+        floatingToast = UiMotion.FloatingToastController(
+            findViewById(R.id.layoutFloatingToast),
+            findViewById(R.id.tvToastMessage),
+            findViewById(R.id.btnToastUndo),
+        )
     }
 
-    private fun setupSpinnersAndSwitches() {
+    private fun setupControls() {
         val prefs = getSharedPreferences(RayoExtension.PREFS_NAME, Context.MODE_PRIVATE)
 
-        // Rayo Profile
-        val profiles = arrayOf("Profil 1", "Profil 2", "Profil 3", "Profil 4")
-        spnDefaultProfile.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, profiles)
-        spnDefaultProfile.setSelection(prefs.getInt(RayoExtension.PREF_DEFAULT_PROFILE, 0))
-        spnDefaultProfile.onItemSelectedListener = simpleSelectListener { pos ->
-            prefs.edit().putInt(RayoExtension.PREF_DEFAULT_PROFILE, pos).apply()
-            RayoExtension.instance?.bleManager?.let { bm ->
-                if (bm.isConnected && bm.currentMode != pos) bm.selectProfile(pos)
+        // Default Rayo Profile segmented control
+        val savedDefProf = prefs.getInt(RayoExtension.PREF_DEFAULT_PROFILE, 0).coerceIn(0, 3)
+        UiMotion.updateSegmentedButtons(defProfButtons, savedDefProf)
+        defProfButtons.forEachIndexed { idx, btn ->
+            btn.setOnClickListener {
+                val prev = prefs.getInt(RayoExtension.PREF_DEFAULT_PROFILE, 0).coerceIn(0, 3)
+                prefs.edit().putInt(RayoExtension.PREF_DEFAULT_PROFILE, idx).apply()
+                UiMotion.updateSegmentedButtons(defProfButtons, idx)
+                RayoExtension.instance?.bleManager?.let { bm ->
+                    if (bm.isConnected && bm.currentMode != idx) bm.selectProfile(idx)
+                }
+                if (prev != idx) {
+                    floatingToast.show("Standard-Profil: P${idx + 1}") {
+                        prefs.edit().putInt(RayoExtension.PREF_DEFAULT_PROFILE, prev).apply()
+                        UiMotion.updateSegmentedButtons(defProfButtons, prev)
+                        RayoExtension.instance?.bleManager?.let { bm ->
+                            if (bm.isConnected) bm.selectProfile(prev)
+                        }
+                    }
+                }
             }
         }
 
-        // Radar Threat -> Rayo Target Profile (Default: Profil 2 = index 1)
-        spnRadarRayoProfile.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, profiles)
-        spnRadarRayoProfile.setSelection(prefs.getInt(RayoExtension.PREF_RADAR_RAYO_PROFILE, 1).coerceIn(0, 3))
-        spnRadarRayoProfile.onItemSelectedListener = simpleSelectListener { pos ->
-            prefs.edit().putInt(RayoExtension.PREF_RADAR_RAYO_PROFILE, pos).apply()
+        // Radar Threat
+        swRadarThreat.isChecked = prefs.getBoolean(RayoExtension.PREF_RADAR_THREAT, true)
+        swRadarThreat.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit().putBoolean(RayoExtension.PREF_RADAR_THREAT, isChecked).apply()
         }
 
-        // Radar Hold Sec
-        val holdSecOptions = listOf(1, 2, 3, 5)
-        val holdSecLabels = holdSecOptions.map { "$it Sekunden" }
-        spnRadarHoldSec.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, holdSecLabels)
+        val savedRadarProf = prefs.getInt(RayoExtension.PREF_RADAR_RAYO_PROFILE, 1).coerceIn(0, 3)
+        UiMotion.updateSegmentedButtons(radarProfButtons, savedRadarProf)
+        radarProfButtons.forEachIndexed { idx, btn ->
+            btn.setOnClickListener {
+                prefs.edit().putInt(RayoExtension.PREF_RADAR_RAYO_PROFILE, idx).apply()
+                UiMotion.updateSegmentedButtons(radarProfButtons, idx)
+                floatingToast.show("Radar-Zielprofil: P${idx + 1}")
+            }
+        }
+
         val savedHold = prefs.getInt(RayoExtension.PREF_RADAR_HOLD_SEC, 3)
-        spnRadarHoldSec.setSelection(holdSecOptions.indexOf(savedHold).coerceAtLeast(0))
-        spnRadarHoldSec.onItemSelectedListener = simpleSelectListener { pos ->
-            prefs.edit().putInt(RayoExtension.PREF_RADAR_HOLD_SEC, holdSecOptions[pos]).apply()
+        UiMotion.updateSegmentedButtons(holdButtons, holdValues.indexOf(savedHold).coerceAtLeast(2))
+        holdButtons.forEachIndexed { idx, btn ->
+            btn.setOnClickListener {
+                val sec = holdValues[idx]
+                prefs.edit().putInt(RayoExtension.PREF_RADAR_HOLD_SEC, sec).apply()
+                UiMotion.updateSegmentedButtons(holdButtons, idx)
+            }
         }
 
-        // Radar Simulator Switch
         swRadarSim.isChecked = prefs.getBoolean(RayoExtension.PREF_SIMULATE_RADAR, false)
         swRadarSim.setOnCheckedChangeListener { _, isChecked ->
             prefs.edit().putBoolean(RayoExtension.PREF_SIMULATE_RADAR, isChecked).apply()
             if (isChecked) {
                 RayoExtension.instance?.startRadarSimulation()
-                tvSettingsLog.text = "🧪 Radar-Simulator gestartet!"
+                floatingToast.show("Radar-Simulator gestartet")
             } else {
                 RayoExtension.instance?.stopRadarSimulation()
-                tvSettingsLog.text = "Radar-Simulator beendet."
+                floatingToast.show("Radar-Simulator beendet")
             }
         }
 
@@ -208,142 +227,158 @@ class SettingsActivity : AppCompatActivity() {
             prefs.edit().putBoolean(RayoExtension.PREF_LIGHT_SENSOR_ENABLED, isChecked).apply()
         }
 
-        val luxOptions = listOf(50f, 150f, 400f)
-        val luxLabels = listOf("50 lx (Sehr dunkel / Tunnel)", "150 lx (Dämmerung / Wald)", "400 lx (Bewölkt)")
-        spnLightSensorThreshold.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, luxLabels)
         val savedLux = prefs.getFloat(RayoExtension.PREF_LIGHT_SENSOR_THRESHOLD, 150f)
-        spnLightSensorThreshold.setSelection(luxOptions.indexOf(savedLux).coerceAtLeast(1))
-        spnLightSensorThreshold.onItemSelectedListener = simpleSelectListener { pos ->
-            prefs.edit().putFloat(RayoExtension.PREF_LIGHT_SENSOR_THRESHOLD, luxOptions[pos]).apply()
+        UiMotion.updateSegmentedButtons(luxButtons, luxValues.indexOf(savedLux).coerceAtLeast(1))
+        luxButtons.forEachIndexed { idx, btn ->
+            btn.setOnClickListener {
+                prefs.edit().putFloat(RayoExtension.PREF_LIGHT_SENSOR_THRESHOLD, luxValues[idx]).apply()
+                UiMotion.updateSegmentedButtons(luxButtons, idx)
+            }
         }
 
-        spnLightSensorDarkProfile.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, profiles)
-        spnLightSensorDarkProfile.setSelection(prefs.getInt(RayoExtension.PREF_LIGHT_SENSOR_DARK_PROFILE, 0).coerceIn(0, 3))
-        spnLightSensorDarkProfile.onItemSelectedListener = simpleSelectListener { pos ->
-            prefs.edit().putInt(RayoExtension.PREF_LIGHT_SENSOR_DARK_PROFILE, pos).apply()
+        val savedDarkProf = prefs.getInt(RayoExtension.PREF_LIGHT_SENSOR_DARK_PROFILE, 0).coerceIn(0, 3)
+        UiMotion.updateSegmentedButtons(darkProfButtons, savedDarkProf)
+        darkProfButtons.forEachIndexed { idx, btn ->
+            btn.setOnClickListener {
+                prefs.edit().putInt(RayoExtension.PREF_LIGHT_SENSOR_DARK_PROFILE, idx).apply()
+                UiMotion.updateSegmentedButtons(darkProfButtons, idx)
+            }
         }
 
-        val brightActions = listOf(-1, 0, 1, 2, 3)
-        val brightLabels = listOf("Licht AUS", "Profil 1", "Profil 2", "Profil 3", "Profil 4")
-        spnLightSensorBrightAction.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, brightLabels)
         val savedBright = prefs.getInt(RayoExtension.PREF_LIGHT_SENSOR_BRIGHT_ACTION, -1)
-        spnLightSensorBrightAction.setSelection(brightActions.indexOf(savedBright).coerceAtLeast(0))
-        spnLightSensorBrightAction.onItemSelectedListener = simpleSelectListener { pos ->
-            prefs.edit().putInt(RayoExtension.PREF_LIGHT_SENSOR_BRIGHT_ACTION, brightActions[pos]).apply()
+        UiMotion.updateSegmentedButtons(brightButtons, brightValues.indexOf(savedBright).coerceAtLeast(0))
+        brightButtons.forEachIndexed { idx, btn ->
+            btn.setOnClickListener {
+                prefs.edit().putInt(RayoExtension.PREF_LIGHT_SENSOR_BRIGHT_ACTION, brightValues[idx]).apply()
+                UiMotion.updateSegmentedButtons(brightButtons, idx)
+            }
         }
 
-        // G-Brake Sensitivity
-        val sensValues = listOf(0.15f, 0.20f, 0.30f, 0.40f)
-        val sensLabels = listOf("0.15 g (Sehr empfindlich)", "0.20 g (Normal / Empfohlen)", "0.30 g (Sportlich)", "0.40 g (Nur starkes Bremsen)")
-        spnBrakeSensitivity.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, sensLabels)
-        val savedSens = prefs.getFloat(RayoExtension.PREF_BRAKE_THRESHOLD, 0.20f)
-        spnBrakeSensitivity.setSelection(sensValues.indexOf(savedSens).coerceAtLeast(0))
-        spnBrakeSensitivity.onItemSelectedListener = simpleSelectListener { pos ->
-            prefs.edit().putFloat(RayoExtension.PREF_BRAKE_THRESHOLD, sensValues[pos]).apply()
-        }
-
-        // G-Brake Hold Sec
-        val brakeHoldOptions = listOf(1, 2, 3, 5)
-        val brakeHoldLabels = brakeHoldOptions.map { "$it Sekunden" }
-        spnBrakeHoldSec.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, brakeHoldLabels)
-        val savedBrakeHold = prefs.getInt(RayoExtension.PREF_BRAKE_HOLD_SEC, 2)
-        spnBrakeHoldSec.setSelection(brakeHoldOptions.indexOf(savedBrakeHold).coerceAtLeast(0))
-        spnBrakeHoldSec.onItemSelectedListener = simpleSelectListener { pos ->
-            prefs.edit().putInt(RayoExtension.PREF_BRAKE_HOLD_SEC, brakeHoldOptions[pos]).apply()
-        }
-
-        // Speed Adaptive Threshold
-        val speedOptions = listOf(20, 25, 28, 30, 35)
-        val speedLabels = speedOptions.map { "Ab $it km/h" }
-        spnSpeedThreshold.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, speedLabels)
-        val savedSpeedThresh = prefs.getInt(RayoExtension.PREF_SPEED_THRESHOLD, 28)
-        spnSpeedThreshold.setSelection(speedOptions.indexOf(savedSpeedThresh).coerceAtLeast(0))
-        spnSpeedThreshold.onItemSelectedListener = simpleSelectListener { pos ->
-            prefs.edit().putInt(RayoExtension.PREF_SPEED_THRESHOLD, speedOptions[pos]).apply()
-        }
-
-        // Pause Behavior
-        val pauseKeys = listOf("NONE", "LOW", "OFF")
-        val pauseLabels = listOf("Licht unverändert anlassen", "Auf Sparmodus (Dauerlicht Spar) dimmen", "Licht komplett ausschalten")
-        spnPauseBehavior.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, pauseLabels)
-        val savedPause = prefs.getString(RayoExtension.PREF_PAUSE_BEHAVIOR, "NONE")
-        spnPauseBehavior.setSelection(pauseKeys.indexOf(savedPause).coerceAtLeast(0))
-        spnPauseBehavior.onItemSelectedListener = simpleSelectListener { pos ->
-            prefs.edit().putString(RayoExtension.PREF_PAUSE_BEHAVIOR, pauseKeys[pos]).apply()
-        }
-
-        // Switches
-        swRadarThreat.setOnCheckedChangeListener { _, isChecked ->
-            prefs.edit().putBoolean(RayoExtension.PREF_RADAR_THREAT, isChecked).apply()
-        }
-        swBrakeEnabled.setOnCheckedChangeListener { _, isChecked ->
-            prefs.edit().putBoolean(RayoExtension.PREF_BRAKE_ENABLED, isChecked).apply()
-        }
-        swSpeedAdaptive.setOnCheckedChangeListener { _, isChecked ->
-            prefs.edit().putBoolean(RayoExtension.PREF_SPEED_ADAPTIVE_ENABLED, isChecked).apply()
-        }
+        // Ride Automation
+        swAutoStart.isChecked = prefs.getBoolean(RayoExtension.PREF_AUTO_START, true)
         swAutoStart.setOnCheckedChangeListener { _, isChecked ->
             prefs.edit().putBoolean(RayoExtension.PREF_AUTO_START, isChecked).apply()
         }
-        swInRideAlerts.setOnCheckedChangeListener { _, isChecked ->
-            prefs.edit().putBoolean(RayoExtension.PREF_IN_RIDE_ALERTS, isChecked).apply()
+
+        val savedPause = prefs.getString(RayoExtension.PREF_PAUSE_BEHAVIOR, "NONE")
+        UiMotion.updateSegmentedButtons(pauseButtons, pauseKeys.indexOf(savedPause).coerceAtLeast(0))
+        pauseButtons.forEachIndexed { idx, btn ->
+            btn.setOnClickListener {
+                prefs.edit().putString(RayoExtension.PREF_PAUSE_BEHAVIOR, pauseKeys[idx]).apply()
+                UiMotion.updateSegmentedButtons(pauseButtons, idx)
+            }
         }
+
+        // Primary & Secondary Buttons
+        btnScanPair.setOnClickListener { startPairingScan() }
+        btnTestToggle.setOnClickListener { toggleRayoFromSettings() }
+        btnCommandPalette.setOnClickListener { openCommandPalette() }
+
+        val allInteractive = listOf(btnCommandPalette, btnScanPair, btnTestToggle) +
+            defProfButtons + radarProfButtons + holdButtons +
+            luxButtons + darkProfButtons + brightButtons + pauseButtons
+        UiMotion.attachPressFeedback(*allInteractive.toTypedArray())
     }
 
-    private fun setupClickListeners() {
-        val prefs = getSharedPreferences(RayoExtension.PREFS_NAME, Context.MODE_PRIVATE)
-        val isGerman = Locale.getDefault().language.startsWith("de")
-
-        btnScanPair.setOnClickListener {
-            startPairingScan()
+    private fun toggleRayoFromSettings() {
+        val ext = RayoExtension.instance
+        if (ext == null) {
+            startService(Intent(this, RayoExtension::class.java))
+            floatingToast.show("Starte Rayo-Dienst…")
+            return
+        }
+        val bm = ext.bleManager
+        if (!bm.isConnected) {
+            val savedMac = getSharedPreferences(RayoExtension.PREFS_NAME, Context.MODE_PRIVATE)
+                .getString(RayoExtension.PREF_MAC, null)
+            if (!savedMac.isNullOrEmpty()) {
+                ext.connectBle(savedMac, autoTurnOn = true)
+                floatingToast.show("Verbinde mit Rayo…")
+            } else {
+                floatingToast.show("Bitte zuerst Rayo koppeln")
+                startPairingScan()
+            }
+            return
         }
 
-        btnTestToggle.setOnClickListener {
-            val ext = RayoExtension.instance
-            if (ext == null) {
-                startService(Intent(this, RayoExtension::class.java))
-                tvSettingsLog.text = "Starte Rayo-Dienst… bitte gleich nochmal tippen."
-                return@setOnClickListener
-            }
-
-            val bm = ext.bleManager
-            if (!bm.isConnected) {
-                val mac = prefs.getString(RayoExtension.PREF_MAC, null)
-                if (mac.isNullOrEmpty()) {
-                    tvSettingsLog.text = "Bitte zuerst ein Rayo koppeln!"
-                } else {
-                    tvSettingsLog.text = "Verbinde mit Rayo ($mac)…"
-                    ext.connectBle(mac)
-                }
-                return@setOnClickListener
-            }
-
-            val newState = !bm.isLightOn
-            bm.setLight(newState)
+        val prevState = bm.isLightOn
+        val newState = !prevState
+        bm.setLight(newState)
+        ext.updateAllRayoDataFields()
+        updateTestButtonText(newState)
+        floatingToast.show(if (newState) "Rayo: Licht AN" else "Rayo: Licht AUS") {
+            bm.setLight(prevState)
             ext.updateAllRayoDataFields()
-            tvSettingsLog.text = if (newState) "Rayo: LICHT AN!" else "Rayo: LICHT AUS!"
-            updateTestButtonText(newState)
+            updateTestButtonText(prevState)
         }
     }
 
-    private fun simpleSelectListener(action: (Int) -> Unit) = object : AdapterView.OnItemSelectedListener {
-        override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-            action(position)
+    private fun openCommandPalette() {
+        val prefs = getSharedPreferences(RayoExtension.PREFS_NAME, Context.MODE_PRIVATE)
+        val ext = RayoExtension.instance
+        val cmds = mutableListOf(
+            UiMotion.CommandItem("Rayo suchen & koppeln", tvPairedStatus.text.toString()) {
+                startPairingScan()
+            },
+            UiMotion.CommandItem("Licht umschalten (AN/AUS)", "Bluetooth-Steuerung") {
+                toggleRayoFromSettings()
+            },
+            UiMotion.CommandItem(
+                if (swRadarSim.isChecked) "Radar-Simulator stoppen" else "Radar-Simulator starten",
+                "Offline Testlauf",
+            ) {
+                swRadarSim.isChecked = !swRadarSim.isChecked
+            },
+        )
+        for (i in 0..3) {
+            cmds.add(
+                UiMotion.CommandItem("Standard-Profil P${i + 1} wählen", "Sofort aktivieren") {
+                    defProfButtons[i].performClick()
+                },
+            )
         }
-        override fun onNothingSelected(parent: AdapterView<*>?) {}
+        cmds.add(
+            UiMotion.CommandItem("Auto-Lichtsensor umschalten", tvLightSensorStatus.text.toString()) {
+                swLightSensorEnabled.isChecked = !swLightSensorEnabled.isChecked
+                floatingToast.show(
+                    if (swLightSensorEnabled.isChecked) "Lichtsensor aktiviert" else "Lichtsensor deaktiviert",
+                )
+            },
+        )
+        if (ext != null) {
+            cmds.add(
+                UiMotion.CommandItem("Auf Werkseinstellungen zurücksetzen", "Alle Optionen auf Standard") {
+                    prefs.edit()
+                        .putInt(RayoExtension.PREF_DEFAULT_PROFILE, 0)
+                        .putInt(RayoExtension.PREF_RADAR_RAYO_PROFILE, 1)
+                        .putInt(RayoExtension.PREF_RADAR_HOLD_SEC, 3)
+                        .putBoolean(RayoExtension.PREF_RADAR_THREAT, true)
+                        .putBoolean(RayoExtension.PREF_LIGHT_SENSOR_ENABLED, false)
+                        .putFloat(RayoExtension.PREF_LIGHT_SENSOR_THRESHOLD, 150f)
+                        .putInt(RayoExtension.PREF_LIGHT_SENSOR_DARK_PROFILE, 0)
+                        .putInt(RayoExtension.PREF_LIGHT_SENSOR_BRIGHT_ACTION, -1)
+                        .putBoolean(RayoExtension.PREF_AUTO_START, true)
+                        .putString(RayoExtension.PREF_PAUSE_BEHAVIOR, "NONE")
+                        .apply()
+                    recreate()
+                },
+            )
+        }
+        UiMotion.showCommandPalette(this, cmds)
     }
 
     override fun onResume() {
         super.onResume()
-        RayoExtension.instance?.bleManager?.addListener(bleListener)
+        val ext = RayoExtension.instance
+        ext?.bleManager?.addListener(bleListener)
 
-        RayoExtension.instance?.onSimulationStep = { _, label ->
+        ext?.onSimulationStep = { _, label ->
             runOnUiThread {
-                tvSettingsLog.text = label
+                floatingToast.show(label)
             }
         }
 
-        RayoExtension.instance?.let { ext ->
+        if (ext != null) {
             updateLightSensorLabel(ext.hasLightSensor, ext.currentLux, ext.isDarkEnvironment)
             ext.onLightSensorUpdate = { lux, isDark ->
                 runOnUiThread {
@@ -352,21 +387,16 @@ class SettingsActivity : AppCompatActivity() {
             }
         }
 
-        val bm = RayoExtension.instance?.bleManager
+        val bm = ext?.bleManager
         if (bm != null && bm.isConnected) {
-            val bat = if (bm.batteryPercent >= 0) " (${bm.batteryPercent}%)" else ""
-            tvPairedStatus.text = "Verbunden: ${bm.connectedDeviceName ?: "RAYO"} [${bm.connectedMac}]$bat"
-            tvPairedStatus.setTextColor(0xFF00E676.toInt())
-            updateTestButtonText(bm.isLightOn)
+            updateConnectionUi(true, bm.connectedDeviceName, bm.connectedMac)
         } else {
             val mac = getSharedPreferences(RayoExtension.PREFS_NAME, Context.MODE_PRIVATE)
                 .getString(RayoExtension.PREF_MAC, null)
+            updateConnectionUi(false, null, mac)
             if (!mac.isNullOrEmpty()) {
-                tvPairedStatus.text = "Gekoppelt: $mac (getrennt)"
-                tvPairedStatus.setTextColor(0xFFFFAA00.toInt())
-                RayoExtension.instance?.connectBle(mac)
+                ext?.connectBle(mac)
             }
-            btnTestToggle.text = "Rayo verbinden & testen"
         }
     }
 
@@ -377,60 +407,79 @@ class SettingsActivity : AppCompatActivity() {
         RayoExtension.instance?.onLightSensorUpdate = null
     }
 
+    private fun updateConnectionUi(connected: Boolean, deviceName: String?, mac: String?) {
+        val bm = RayoExtension.instance?.bleManager
+        if (connected) {
+            val bat = bm?.batteryPercent?.takeIf { it >= 0 }?.let { " · $it%" } ?: ""
+            tvPairedStatus.text = "${deviceName ?: "RAYO"}$bat"
+            tvPairedStatus.setTextColor(getColor(R.color.status_ok_fg))
+
+            // Single Focal CTA moves from Pair to Power Test once paired & connected
+            btnScanPair.setBackgroundResource(R.drawable.bg_btn_secondary)
+            btnScanPair.setTextColor(getColor(R.color.text_primary))
+            btnScanPair.text = "Anderes Rayo koppeln"
+
+            btnTestToggle.setBackgroundResource(R.drawable.bg_btn_primary)
+            btnTestToggle.setTextColor(getColor(R.color.accent_on_primary))
+            updateTestButtonText(bm?.isLightOn ?: false)
+        } else {
+            if (!mac.isNullOrEmpty()) {
+                tvPairedStatus.text = "Gekoppelt: $mac (getrennt)"
+                tvPairedStatus.setTextColor(getColor(R.color.status_warn_fg))
+            } else {
+                tvPairedStatus.text = getString(R.string.not_paired)
+                tvPairedStatus.setTextColor(getColor(R.color.text_secondary))
+            }
+
+            btnScanPair.setBackgroundResource(R.drawable.bg_btn_primary)
+            btnScanPair.setTextColor(getColor(R.color.accent_on_primary))
+            btnScanPair.text = getString(R.string.btn_scan_pair)
+
+            btnTestToggle.setBackgroundResource(R.drawable.bg_btn_secondary)
+            btnTestToggle.setTextColor(getColor(R.color.text_primary))
+            btnTestToggle.text = "Rayo verbinden & testen"
+        }
+    }
+
     private fun updateLightSensorLabel(hasSensor: Boolean, lux: Float, isDark: Boolean) {
         if (!hasSensor) {
-            tvLightSensorStatus.text = "Kein Lichtsensor auf diesem Gerät gefunden"
-            tvLightSensorStatus.setTextColor(0xFFFF2A55.toInt())
+            tvLightSensorStatus.text = "Nicht verfügbar"
+            tvLightSensorStatus.setTextColor(getColor(R.color.destructive_tint_fg))
         } else if (lux < 0f) {
-            tvLightSensorStatus.text = "Lichtsensor aktiv — warte auf Messwert..."
-            tvLightSensorStatus.setTextColor(0xFF9E9EA7.toInt())
+            tvLightSensorStatus.text = "Warte…"
+            tvLightSensorStatus.setTextColor(getColor(R.color.text_secondary))
         } else {
             val stateText = if (isDark) "Dunkel" else "Hell"
-            tvLightSensorStatus.text = "Aktuell: ${lux.toInt()} lx ($stateText)"
-            tvLightSensorStatus.setTextColor(if (isDark) 0xFFFFAA00.toInt() else 0xFF00E676.toInt())
+            tvLightSensorStatus.text = "${lux.toInt()} lx · $stateText"
+            tvLightSensorStatus.setTextColor(
+                getColor(if (isDark) R.color.status_warn_fg else R.color.status_ok_fg),
+            )
         }
     }
 
     private fun updateTestButtonText(isLightOn: Boolean) {
-        if (isLightOn) {
-            btnTestToggle.text = "Rayo: LICHT AN (Tippen für AUS)"
-            btnTestToggle.setBackgroundColor(0xFF00E676.toInt())
-            btnTestToggle.setTextColor(0xFF000000.toInt())
-        } else {
-            btnTestToggle.text = "Rayo: LICHT AUS (Tippen für AN)"
-            btnTestToggle.setBackgroundColor(0xFF282A33.toInt())
-            btnTestToggle.setTextColor(0xFFFFFFFF.toInt())
+        val isConnected = RayoExtension.instance?.bleManager?.isConnected == true
+        if (!isConnected) {
+            btnTestToggle.text = "Rayo verbinden & testen"
+            return
         }
-    }
-
-    private fun loadPreferences() {
-        val prefs = getSharedPreferences(RayoExtension.PREFS_NAME, Context.MODE_PRIVATE)
-        val mac = prefs.getString(RayoExtension.PREF_MAC, null)
-        if (!mac.isNullOrEmpty()) {
-            tvPairedStatus.text = getString(R.string.paired_device_format, mac)
-            tvPairedStatus.setTextColor(0xFFFFAA00.toInt())
+        btnTestToggle.text = if (isLightOn) {
+            "Licht AN (Tippen für AUS)"
         } else {
-            tvPairedStatus.text = getString(R.string.not_paired)
-            tvPairedStatus.setTextColor(0xFFFFFFFF.toInt())
+            "Licht AUS (Tippen für AN)"
         }
-
-        swRadarThreat.isChecked = prefs.getBoolean(RayoExtension.PREF_RADAR_THREAT, true)
-        swBrakeEnabled.isChecked = prefs.getBoolean(RayoExtension.PREF_BRAKE_ENABLED, true)
-        swSpeedAdaptive.isChecked = prefs.getBoolean(RayoExtension.PREF_SPEED_ADAPTIVE_ENABLED, false)
-        swAutoStart.isChecked = prefs.getBoolean(RayoExtension.PREF_AUTO_START, true)
-        swInRideAlerts.isChecked = prefs.getBoolean(RayoExtension.PREF_IN_RIDE_ALERTS, true)
     }
 
     private fun startPairingScan() {
         if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled) {
-            tvSettingsLog.text = "Bluetooth ist deaktiviert!"
+            floatingToast.show("Bluetooth ist deaktiviert!")
             return
         }
         if (isScanning) return
 
         val scanner = bluetoothAdapter.bluetoothLeScanner ?: return
         isScanning = true
-        tvSettingsLog.text = getString(R.string.status_scanning)
+        floatingToast.show(getString(R.string.status_scanning))
         btnScanPair.isEnabled = false
 
         val settings = ScanSettings.Builder()
@@ -452,7 +501,7 @@ class SettingsActivity : AppCompatActivity() {
             override fun onScanFailed(errorCode: Int) {
                 isScanning = false
                 btnScanPair.isEnabled = true
-                tvSettingsLog.text = "Scan fehlgeschlagen ($errorCode)"
+                floatingToast.show("Scan fehlgeschlagen ($errorCode)")
             }
         }
 
@@ -461,19 +510,21 @@ class SettingsActivity : AppCompatActivity() {
             handler.postDelayed({
                 if (isScanning) {
                     stopScan(scanner, callback)
-                    tvSettingsLog.text = getString(R.string.status_not_found)
+                    floatingToast.show(getString(R.string.status_not_found))
                 }
             }, 12000)
         } catch (e: Exception) {
             isScanning = false
             btnScanPair.isEnabled = true
-            tvSettingsLog.text = "Fehler beim Scannen: ${e.message}"
+            floatingToast.show("Scan-Fehler: ${e.message}")
         }
     }
 
     private fun stopScan(scanner: android.bluetooth.le.BluetoothLeScanner, callback: ScanCallback) {
         if (isScanning) {
-            try { scanner.stopScan(callback) } catch (ignored: Exception) {}
+            try {
+                scanner.stopScan(callback)
+            } catch (ignored: Exception) {}
             isScanning = false
             handler.post { btnScanPair.isEnabled = true }
         }
@@ -484,8 +535,8 @@ class SettingsActivity : AppCompatActivity() {
         prefs.edit().putString(RayoExtension.PREF_MAC, mac).apply()
 
         tvPairedStatus.text = "Gekoppelt: $name ($mac)"
-        tvPairedStatus.setTextColor(0xFF00E676.toInt())
-        tvSettingsLog.text = "Rayo gekoppelt! Verbinde…"
+        tvPairedStatus.setTextColor(getColor(R.color.status_ok_fg))
+        floatingToast.show("Rayo gekoppelt! Verbinde…")
 
         startService(Intent(this, RayoExtension::class.java))
         RayoExtension.instance?.connectBle(mac)

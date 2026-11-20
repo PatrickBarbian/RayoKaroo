@@ -25,7 +25,6 @@ import io.hammerhead.karooext.models.DataPoint
 import io.hammerhead.karooext.models.DataType
 import io.hammerhead.karooext.models.Device
 import io.hammerhead.karooext.models.DeviceEvent
-import io.hammerhead.karooext.models.InRideAlert
 import io.hammerhead.karooext.models.OnBatteryStatus
 import io.hammerhead.karooext.models.OnConnectionStatus
 import io.hammerhead.karooext.models.OnDataPoint
@@ -69,18 +68,8 @@ class RayoExtension : KarooExtension("rayo", "1.0.0") {
         const val PREF_LIGHT_SENSOR_DARK_PROFILE = "light_sensor_dark_profile"
         const val PREF_LIGHT_SENSOR_BRIGHT_ACTION = "light_sensor_bright_action"
 
-        // G-Brake settings
-        const val PREF_BRAKE_ENABLED = "brake_enabled"
-        const val PREF_BRAKE_THRESHOLD = "brake_threshold"
-        const val PREF_BRAKE_HOLD_SEC = "brake_hold_sec"
-
-        // Speed Adaptive settings
-        const val PREF_SPEED_ADAPTIVE_ENABLED = "speed_adaptive_enabled"
-        const val PREF_SPEED_THRESHOLD = "speed_threshold"
-
-        // Pause & Alert settings
+        // Pause settings
         const val PREF_PAUSE_BEHAVIOR = "pause_behavior"
-        const val PREF_IN_RIDE_ALERTS = "in_ride_alerts"
 
         // Extension Data Types
         const val TYPE_RAYO_CONTROL = "rayo_control"
@@ -105,15 +94,6 @@ class RayoExtension : KarooExtension("rayo", "1.0.0") {
     var currentThreatLevel: Int = 0
         private set
 
-    @Volatile var isBrakingActive: Boolean = false
-        private set
-
-    @Volatile var isSpeedAdaptiveActive: Boolean = false
-        private set
-
-    @Volatile var currentSpeedKmh: Float = 0f
-        private set
-
     @Volatile var currentLux: Float = -1f
         private set
 
@@ -126,7 +106,6 @@ class RayoExtension : KarooExtension("rayo", "1.0.0") {
     private var preThreatRayoProfile: Int? = null
     private var preThreatRayoWasOn: Boolean? = null
     private var threatHoldJob: Job? = null
-    private var brakeHoldJob: Job? = null
     private var radarSimulatorJob: Job? = null
     private var lightSensorDebounceJob: Job? = null
     private var pendingDarkState: Boolean? = null
@@ -135,11 +114,9 @@ class RayoExtension : KarooExtension("rayo", "1.0.0") {
     var onLightSensorUpdate: ((lux: Float, isDark: Boolean) -> Unit)? = null
 
     private var radarConsumerId: String? = null
-    private var speedConsumerId: String? = null
 
-    // G-Sensor & Light Sensor
+    // Light Sensor
     private var sensorManager: SensorManager? = null
-    private var accelListener: SensorEventListener? = null
     private var lightSensorListener: SensorEventListener? = null
 
     override val types by lazy {
@@ -155,8 +132,7 @@ class RayoExtension : KarooExtension("rayo", "1.0.0") {
 
         karooSystem = KarooSystemService(this)
 
-        // Setup G-Sensor Accelerometer for G-Force Bremslicht & Ambient Light Sensor
-        setupGForceBrakeSensor()
+        // Setup Ambient Light Sensor
         setupAmbientLightSensor()
 
         // BLE Manager for Rayo
@@ -252,65 +228,6 @@ class RayoExtension : KarooExtension("rayo", "1.0.0") {
 
         // 2. Radar Threat Stream
         startRadarMonitoring()
-
-        // 3. GPS Speed Stream for Speed-Adaptive Lighting
-        startSpeedMonitoring()
-    }
-
-    // --- G-FORCE BRAKE LIGHT ACCELEROMETER ---
-
-    private fun setupGForceBrakeSensor() {
-        if (sensorManager == null) {
-            sensorManager = getSystemService(Context.SENSOR_SERVICE) as? SensorManager
-        }
-        val accel = sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) ?: return
-
-        accelListener = object : SensorEventListener {
-            private var lastY = 0f
-            private var continuousBrakeStartTime = 0L
-
-            override fun onSensorChanged(event: SensorEvent?) {
-                if (event == null || event.sensor.type != Sensor.TYPE_ACCELEROMETER) return
-                val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                if (!prefs.getBoolean(PREF_BRAKE_ENABLED, true)) return
-
-                val y = event.values[1]
-                val deltaY = y - lastY
-                lastY = y
-
-                val decelerationG = -deltaY / 9.81f
-                val thresholdG = prefs.getFloat(PREF_BRAKE_THRESHOLD, 0.20f)
-                val now = System.currentTimeMillis()
-
-                if (decelerationG >= thresholdG) {
-                    if (continuousBrakeStartTime == 0L) {
-                        continuousBrakeStartTime = now
-                    } else if (now - continuousBrakeStartTime >= 200L) {
-                        if (!isBrakingActive) {
-                            isBrakingActive = true
-                            Log.d(TAG, "G-Brake triggered! Deceleration=$decelerationG g")
-                            applyBrakeLight()
-                        }
-                        val holdSec = prefs.getInt(PREF_BRAKE_HOLD_SEC, 2)
-                        brakeHoldJob?.cancel()
-                        brakeHoldJob = scope.launch {
-                            delay(holdSec * 1000L)
-                            isBrakingActive = false
-                            continuousBrakeStartTime = 0L
-                            clearBrakeLight()
-                        }
-                    }
-                } else {
-                    if (!isBrakingActive) {
-                        continuousBrakeStartTime = 0L
-                    }
-                }
-            }
-
-            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
-        }
-
-        sensorManager?.registerListener(accelListener, accel, SensorManager.SENSOR_DELAY_GAME)
     }
 
     // --- AMBIENT LIGHT SENSOR (KAROO 3 TYPE_LIGHT) ---
@@ -408,44 +325,6 @@ class RayoExtension : KarooExtension("rayo", "1.0.0") {
         updateAllRayoDataFields()
     }
 
-    private fun applyBrakeLight() {
-        if (isRadarThreatActive) return
-    }
-
-    private fun clearBrakeLight() {
-        if (isRadarThreatActive) return
-    }
-
-    // --- SPEED ADAPTIVE LIGHTING ---
-
-    private fun startSpeedMonitoring() {
-        if (speedConsumerId != null) return
-        speedConsumerId = karooSystem.addConsumer(
-            OnStreamState.StartStreaming(DataType.Type.SPEED)
-        ) { event: OnStreamState ->
-            if (event.state is StreamState.Streaming) {
-                val values = (event.state as StreamState.Streaming).dataPoint.values
-                val speedMs = values[DataType.Field.SPEED]?.toFloat() ?: 0f
-                currentSpeedKmh = speedMs * 3.6f
-                checkSpeedAdaptiveLighting()
-            }
-        }
-    }
-
-    private fun checkSpeedAdaptiveLighting() {
-        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        if (!prefs.getBoolean(PREF_SPEED_ADAPTIVE_ENABLED, false)) return
-        if (isRadarThreatActive || isBrakingActive) return
-
-        val thresholdKmh = prefs.getInt(PREF_SPEED_THRESHOLD, 28)
-
-        if (currentSpeedKmh >= thresholdKmh && !isSpeedAdaptiveActive) {
-            isSpeedAdaptiveActive = true
-        } else if (currentSpeedKmh < (thresholdKmh - 3) && isSpeedAdaptiveActive) {
-            isSpeedAdaptiveActive = false
-        }
-    }
-
     // --- RADAR THREAT DETECTION ---
 
     private fun startRadarMonitoring() {
@@ -525,36 +404,35 @@ class RayoExtension : KarooExtension("rayo", "1.0.0") {
     fun startRadarSimulation() {
         if (radarSimulatorJob != null) return
         val isGerman = Locale.getDefault().language.startsWith("de")
-        showInRideAlert("🧪 Radar-Simulator", if (isGerman) "Testlauf gestartet" else "Test simulation started")
 
         radarSimulatorJob = scope.launch {
             while (isActive) {
-                onSimulationStep?.invoke(0, if (isGerman) "✅ Straße frei (Normal)" else "✅ Road Clear")
+                onSimulationStep?.invoke(0, if (isGerman) "Straße frei (Normal)" else "Road Clear")
                 onRadarThreatLevel(0)
                 delay(6000L)
                 if (!isActive) break
 
-                onSimulationStep?.invoke(1, if (isGerman) "🚗 Annäherung: Warnblinken (Gelb)" else "🚗 Vehicle Warning (Yellow)")
+                onSimulationStep?.invoke(1, if (isGerman) "Fahrzeug nähert sich (Profil-Wechsel)" else "Vehicle Approaching")
                 onRadarThreatLevel(1)
                 delay(7000L)
                 if (!isActive) break
 
-                onSimulationStep?.invoke(2, if (isGerman) "🚨 Schnelles Fahrzeug: Schneller Puls (Rot)" else "🚨 Fast Vehicle Alert (Red)")
+                onSimulationStep?.invoke(2, if (isGerman) "Schnelles Fahrzeug (Profil-Wechsel)" else "Fast Vehicle Alert")
                 onRadarThreatLevel(2)
                 delay(6000L)
                 if (!isActive) break
 
-                onSimulationStep?.invoke(0, if (isGerman) "✅ Fahrzeug überholt: Normalbetrieb" else "✅ Vehicle Passed")
+                onSimulationStep?.invoke(0, if (isGerman) "Fahrzeug überholt (Normal)" else "Vehicle Passed")
                 onRadarThreatLevel(0)
                 delay(5000L)
                 if (!isActive) break
 
-                onSimulationStep?.invoke(2, if (isGerman) "🚨 Schnelles Fahrzeug (Rot)" else "🚨 Fast Vehicle (Red)")
+                onSimulationStep?.invoke(2, if (isGerman) "Schnelles Fahrzeug" else "Fast Vehicle")
                 onRadarThreatLevel(2)
                 delay(7000L)
                 if (!isActive) break
 
-                onSimulationStep?.invoke(0, if (isGerman) "✅ Straße frei" else "✅ Road Clear")
+                onSimulationStep?.invoke(0, if (isGerman) "Straße frei" else "Road Clear")
                 onRadarThreatLevel(0)
                 delay(8000L)
             }
@@ -567,30 +445,6 @@ class RayoExtension : KarooExtension("rayo", "1.0.0") {
         onRadarThreatLevel(0)
         val isGerman = Locale.getDefault().language.startsWith("de")
         onSimulationStep?.invoke(0, if (isGerman) "Simulator beendet." else "Simulator stopped.")
-        showInRideAlert("🧪 Radar-Simulator", if (isGerman) "Testlauf beendet" else "Test simulation stopped")
-    }
-
-    // --- IN-RIDE ALERTS ---
-
-    fun showInRideAlert(title: String, detail: String) {
-        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        if (!prefs.getBoolean(PREF_IN_RIDE_ALERTS, true)) return
-
-        try {
-            karooSystem.dispatch(
-                InRideAlert(
-                    id = "rayo-alert",
-                    icon = R.drawable.ic_launcher,
-                    title = title,
-                    detail = detail,
-                    autoDismissMs = 3000,
-                    backgroundColor = android.R.color.black,
-                    textColor = android.R.color.white
-                )
-            )
-        } catch (e: Exception) {
-            Log.e(TAG, "Error dispatching InRideAlert", e)
-        }
     }
 
     override fun onBonusAction(actionId: String) {
@@ -732,17 +586,21 @@ class RayoExtension : KarooExtension("rayo", "1.0.0") {
         rv.setOnClickPendingIntent(R.id.btnToggleLight, pToggle)
 
         if (bleManager.isConnecting) {
+            rv.setInt(R.id.btnToggleLight, "setBackgroundResource", R.drawable.bg_datafield_btn_warn)
             rv.setTextViewText(R.id.btnToggleLight, if (isGerman) "VERBINDE..." else "CONNECTING...")
-            rv.setTextColor(R.id.btnToggleLight, Color.parseColor("#FFAA00"))
+            rv.setTextColor(R.id.btnToggleLight, Color.parseColor("#FBBF24"))
         } else if (!bleManager.isConnected) {
-            rv.setTextViewText(R.id.btnToggleLight, if (isGerman) "RAYO VERBINDEN" else "CONNECT RAYO")
-            rv.setTextColor(R.id.btnToggleLight, Color.parseColor("#9E9EA7"))
+            rv.setInt(R.id.btnToggleLight, "setBackgroundResource", R.drawable.bg_datafield_btn_off)
+            rv.setTextViewText(R.id.btnToggleLight, if (isGerman) "VERBINDEN" else "CONNECT")
+            rv.setTextColor(R.id.btnToggleLight, Color.parseColor("#9CA3B0"))
         } else if (bleManager.isLightOn) {
+            rv.setInt(R.id.btnToggleLight, "setBackgroundResource", R.drawable.bg_datafield_btn_on)
             rv.setTextViewText(R.id.btnToggleLight, if (isGerman) "LICHT AN" else "LIGHT ON")
-            rv.setTextColor(R.id.btnToggleLight, Color.parseColor("#00E676"))
+            rv.setTextColor(R.id.btnToggleLight, Color.parseColor("#4ADE80"))
         } else {
+            rv.setInt(R.id.btnToggleLight, "setBackgroundResource", R.drawable.bg_datafield_btn_off)
             rv.setTextViewText(R.id.btnToggleLight, if (isGerman) "LICHT AUS" else "LIGHT OFF")
-            rv.setTextColor(R.id.btnToggleLight, Color.parseColor("#FF2A55"))
+            rv.setTextColor(R.id.btnToggleLight, Color.parseColor("#F4F5F7"))
         }
 
         val cycleIntent = Intent(this, RayoActionReceiver::class.java).apply {
@@ -889,11 +747,9 @@ class RayoExtension : KarooExtension("rayo", "1.0.0") {
 
     override fun onDestroy() {
         stopRadarSimulation()
-        accelListener?.let { sensorManager?.unregisterListener(it) }
         lightSensorListener?.let { sensorManager?.unregisterListener(it) }
         lightSensorDebounceJob?.cancel()
         radarConsumerId?.let { karooSystem.removeConsumer(it) }
-        speedConsumerId?.let { karooSystem.removeConsumer(it) }
         scope.cancel()
         bleManager.disconnect()
         karooSystem.disconnect()

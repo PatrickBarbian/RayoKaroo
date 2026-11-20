@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 60/30/10 Surface Tokens (Dark Mode - Karoo Cockpit) -->
+    <color name="surface_canvas">#0B0C0F</color>
+    <color name="surface_panel">#111318</color>
+    <color name="surface_card">#14161C</color>
+    <color name="surface_recessed">#1B1E26</color>
+    <color name="surface_elevated">#232732</color>
+
+    <!-- 1dp Hairlines -->
+    <color name="border_hairline">#262A36</color>
+    <color name="border_subtle">#1D202A</color>
+
+    <!-- Typography -->
+    <color name="text_primary">#F4F5F7</color>
+    <color name="text_secondary">#9CA3B0</color>
+    <color name="text_muted">#6E7685</color>
+
+    <!-- Single Standout Accent (10%) -->
+    <color name="accent_primary">#F43F5E</color>
+    <color name="accent_primary_pressed">#E11D48</color>
+    <color name="accent_on_primary">#FFFFFF</color>
+
+    <!-- Semantic Status Tints -->
+    <color name="status_ok_bg">#12261B</color>
+    <color name="status_ok_fg">#4ADE80</color>
+    <color name="status_warn_bg">#281F10</color>
+    <color name="status_warn_fg">#FBBF24</color>
+
+    <!-- Destructive (Soft tint at rest, solid on press) -->
+    <color name="destructive_tint_bg">#29141A</color>
+    <color name="destructive_tint_fg">#FB7185</color>
+    <color name="destructive_solid_bg">#E11D48</color>
+</resources>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.KarooApp" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/accent_primary</item>
+        <item name="colorPrimaryVariant">@color/accent_primary_pressed</item>
+        <item name="colorOnPrimary">@color/accent_on_primary</item>
+        <item name="android:windowBackground">@color/surface_canvas</item>
+        <item name="android:statusBarColor">@color/surface_canvas</item>
+        <item name="android:navigationBarColor">@color/surface_canvas</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:textColorPrimary">@color/text_primary</item>
+        <item name="android:textColorSecondary">@color/text_secondary</item>
+    </style>
+</resources>

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Rayo &amp; Radar Licht</string>
-    <string name="extension_description">Intelligente Licht- &amp; Radar-Cockpit-Steuerung für Rayo und Lezyne / ANT+ Lichter</string>
+    <string name="app_name">Rayo Licht-Cockpit</string>
+    <string name="extension_description">Ruhige Bluetooth-, Radar- &amp; Lichtsensor-Steuerung für das Hauteworks Rayo</string>
 
     <!-- Rayo BLE Strings -->
     <string name="datatype_control_name">Rayo Steuerung</string>
@@ -72,4 +72,10 @@
     <string name="pause_behavior_title">Verhalten bei Fahrtpause</string>
     <string name="in_ride_alerts_title">Karoo Pop-up Banner anzeigen</string>
     <string name="in_ride_alerts_desc">Kurze Benachrichtigung oben auf dem Display bei Modus-Wechsel anzeigen</string>
+
+    <string name="btn_commands">Befehle</string>
+    <string name="cmd_title">Schnellbefehle</string>
+    <string name="cmd_search_hint">Aktion, Profil oder Simulator suchen…</string>
+    <string name="cmd_empty">Keine passenden Befehle</string>
+    <string name="action_undo">Rückgängig</string>
 </resources>

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Rayo &amp; Radar Lights</string>
-    <string name="extension_description">Intelligent light &amp; radar cockpit controller for Rayo and Lezyne / ANT+ lights</string>
+    <string name="app_name">Rayo Light Cockpit</string>
+    <string name="extension_description">Calm Bluetooth, radar &amp; ambient light controller for Hauteworks Rayo</string>
 
     <!-- Rayo BLE Strings -->
     <string name="datatype_control_name">Rayo Controller</string>
@@ -72,4 +72,10 @@
     <string name="pause_behavior_title">Ride Pause Behavior</string>
     <string name="in_ride_alerts_title">Show Karoo In-Ride Popups</string>
     <string name="in_ride_alerts_desc">Display top banner on Karoo when light mode changes</string>
+
+    <string name="btn_commands">Commands</string>
+    <string name="cmd_title">Quick Commands</string>
+    <string name="cmd_search_hint">Search action, profile or simulator…</string>
+    <string name="cmd_empty">No matching commands</string>
+    <string name="action_undo">Undo</string>
 </resources>
