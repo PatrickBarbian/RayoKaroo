@@ -19,7 +19,7 @@
     <string name="settings_title">Licht- &amp; Radar-Cockpit</string>
     <string name="section_rayo">Hauteworks Rayo (Bluetooth)</string>
     <string name="section_ant">Lezyne Radar / ANT+ Lichter</string>
-    <string name="section_radar">Radar-Warnreaktion (Threat Mode)</string>
+    <string name="section_radar">Radar-Reaktion</string>
     <string name="section_brake">G-Force Bremslicht (Beschleunigungssensor)</string>
     <string name="section_speed">Geschwindigkeits-Automatik (Speed-Adaptive)</string>
     <string name="section_automation">Fahrt-Automatik &amp; Pause</string>
@@ -50,7 +50,7 @@
     <string name="radar_threat_yellow_title">Modus bei gelber Warnung (Fahrzeug nähert sich)</string>
     <string name="radar_threat_red_title">Modus bei roter Warnung (Schnelles Fahrzeug / Kolonne)</string>
     <string name="radar_hold_title">Radar Haltezeit nach Überholvorgang</string>
-    <string name="radar_sim_title">🧪 Radar-Simulator (Indoor-Test)</string>
+    <string name="radar_sim_title">Radar-Simulator (Indoor-Test)</string>
     <string name="radar_sim_desc">Spielt eine Offline-Simulation herannahender Fahrzeuge ab, um das Warnblinken zu testen</string>
 
     <!-- G-Brake Settings -->

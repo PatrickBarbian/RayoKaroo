@@ -17,7 +17,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.Window
 import android.view.animation.DecelerateInterpolator
-import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -83,7 +82,7 @@ object UiMotion {
     class FloatingToastController(
         private val container: View,
         private val messageView: TextView,
-        private val undoButton: Button,
+        private val undoButton: TextView,
     ) {
         private val handler = Handler(Looper.getMainLooper())
         private val hideRunnable = Runnable { hide() }

@@ -14,7 +14,6 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import android.widget.Button
 import android.widget.Switch
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -24,24 +23,24 @@ import java.util.Locale
 class SettingsActivity : AppCompatActivity() {
 
     private lateinit var tvPairedStatus: TextView
-    private lateinit var btnCommandPalette: Button
-    private lateinit var btnScanPair: Button
-    private lateinit var btnTestToggle: Button
+    private lateinit var btnCommandPalette: TextView
+    private lateinit var btnScanPair: TextView
+    private lateinit var btnTestToggle: TextView
 
-    private lateinit var defProfButtons: List<Button>
+    private lateinit var defProfButtons: List<TextView>
     private lateinit var swRadarThreat: Switch
-    private lateinit var radarProfButtons: List<Button>
-    private lateinit var holdButtons: List<Button>
+    private lateinit var radarProfButtons: List<TextView>
+    private lateinit var holdButtons: List<TextView>
     private lateinit var swRadarSim: Switch
 
     private lateinit var tvLightSensorStatus: TextView
     private lateinit var swLightSensorEnabled: Switch
-    private lateinit var luxButtons: List<Button>
-    private lateinit var darkProfButtons: List<Button>
-    private lateinit var brightButtons: List<Button>
+    private lateinit var luxButtons: List<TextView>
+    private lateinit var darkProfButtons: List<TextView>
+    private lateinit var brightButtons: List<TextView>
 
     private lateinit var swAutoStart: Switch
-    private lateinit var pauseButtons: List<Button>
+    private lateinit var pauseButtons: List<TextView>
 
     private lateinit var floatingToast: UiMotion.FloatingToastController
 

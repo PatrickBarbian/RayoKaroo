@@ -19,7 +19,7 @@
     <string name="settings_title">Light &amp; Radar Cockpit</string>
     <string name="section_rayo">Hauteworks Rayo (Bluetooth)</string>
     <string name="section_ant">Lezyne Radar / ANT+ Lights</string>
-    <string name="section_radar">Radar Threat Reaction</string>
+    <string name="section_radar">Radar Reaction</string>
     <string name="section_brake">G-Force Smart Brake Light</string>
     <string name="section_speed">Speed-Adaptive Lighting</string>
     <string name="section_automation">Ride Automation &amp; Pause</string>
@@ -50,7 +50,7 @@
     <string name="radar_threat_yellow_title">Yellow Threat Mode (Vehicle Approaching)</string>
     <string name="radar_threat_red_title">Red Threat Mode (High-Speed / Platoon)</string>
     <string name="radar_hold_title">Threat Hold Time</string>
-    <string name="radar_sim_title">🧪 Radar Simulator (Indoor Testing)</string>
+    <string name="radar_sim_title">Radar Simulator (Indoor Test)</string>
     <string name="radar_sim_desc">Runs an offline simulation of approaching cars to test threat lighting</string>
 
     <!-- G-Brake Settings -->

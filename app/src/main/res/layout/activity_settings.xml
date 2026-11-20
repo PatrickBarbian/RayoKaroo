@@ -55,18 +55,20 @@
                         android:textSize="12sp" />
                 </LinearLayout>
 
-                <Button
+                <TextView
                     android:id="@+id/btnCommandPalette"
                     android:layout_width="wrap_content"
                     android:layout_height="34dp"
                     android:background="@drawable/bg_btn_secondary"
-                    android:minWidth="0dp"
-                    android:paddingHorizontal="10dp"
-                    android:stateListAnimator="@null"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:maxLines="1"
+                    android:paddingHorizontal="12dp"
                     android:text="@string/btn_commands"
-                    android:textAllCaps="false"
                     android:textColor="@color/text_primary"
-                    android:textSize="12sp" />
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
             </LinearLayout>
 
             <!-- 1. RAYO CONNECTION & DEFAULT PROFILE (FOCAL CARD) -->
@@ -82,36 +84,46 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:letterSpacing="0.06"
+                    android:maxLines="1"
                     android:text="@string/section_rayo"
                     android:textAllCaps="true"
                     android:textColor="@color/text_secondary"
                     android:textSize="11sp"
                     android:textStyle="bold" />
 
-                <Button
+                <TextView
                     android:id="@+id/btnScanPair"
                     android:layout_width="match_parent"
-                    android:layout_height="44dp"
+                    android:layout_height="42dp"
                     android:layout_marginTop="10dp"
                     android:background="@drawable/bg_btn_primary"
-                    android:stateListAnimator="@null"
+                    android:clickable="true"
+                    android:ellipsize="end"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:maxLines="1"
+                    android:paddingHorizontal="12dp"
                     android:text="@string/btn_scan_pair"
-                    android:textAllCaps="false"
                     android:textColor="@color/accent_on_primary"
                     android:textSize="13sp"
                     android:textStyle="bold" />
 
-                <Button
+                <TextView
                     android:id="@+id/btnTestToggle"
                     android:layout_width="match_parent"
-                    android:layout_height="42dp"
+                    android:layout_height="40dp"
                     android:layout_marginTop="8dp"
                     android:background="@drawable/bg_btn_secondary"
-                    android:stateListAnimator="@null"
+                    android:clickable="true"
+                    android:ellipsize="end"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:maxLines="1"
+                    android:paddingHorizontal="12dp"
                     android:text="@string/test_connection"
-                    android:textAllCaps="false"
                     android:textColor="@color/text_primary"
-                    android:textSize="13sp" />
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
 
                 <View
                     android:layout_width="match_parent"
@@ -135,59 +147,67 @@
                     android:orientation="horizontal"
                     android:padding="3dp">
 
-                    <Button
+                    <TextView
                         android:id="@+id/btnDefProf0"
                         android:layout_width="0dp"
-                        android:layout_height="36dp"
+                        android:layout_height="34dp"
                         android:layout_weight="1"
                         android:background="@drawable/bg_segment_active"
+                        android:clickable="true"
+                        android:focusable="true"
                         android:fontFeatureSettings="tnum"
-                        android:minWidth="0dp"
-                        android:stateListAnimator="@null"
+                        android:gravity="center"
+                        android:maxLines="1"
+                        android:paddingHorizontal="2dp"
                         android:text="P1"
-                        android:textAllCaps="false"
                         android:textColor="@color/text_primary"
                         android:textSize="12sp" />
 
-                    <Button
+                    <TextView
                         android:id="@+id/btnDefProf1"
                         android:layout_width="0dp"
-                        android:layout_height="36dp"
+                        android:layout_height="34dp"
                         android:layout_weight="1"
                         android:background="@android:color/transparent"
+                        android:clickable="true"
+                        android:focusable="true"
                         android:fontFeatureSettings="tnum"
-                        android:minWidth="0dp"
-                        android:stateListAnimator="@null"
+                        android:gravity="center"
+                        android:maxLines="1"
+                        android:paddingHorizontal="2dp"
                         android:text="P2"
-                        android:textAllCaps="false"
                         android:textColor="@color/text_secondary"
                         android:textSize="12sp" />
 
-                    <Button
+                    <TextView
                         android:id="@+id/btnDefProf2"
                         android:layout_width="0dp"
-                        android:layout_height="36dp"
+                        android:layout_height="34dp"
                         android:layout_weight="1"
                         android:background="@android:color/transparent"
+                        android:clickable="true"
+                        android:focusable="true"
                         android:fontFeatureSettings="tnum"
-                        android:minWidth="0dp"
-                        android:stateListAnimator="@null"
+                        android:gravity="center"
+                        android:maxLines="1"
+                        android:paddingHorizontal="2dp"
                         android:text="P3"
-                        android:textAllCaps="false"
                         android:textColor="@color/text_secondary"
                         android:textSize="12sp" />
 
-                    <Button
+                    <TextView
                         android:id="@+id/btnDefProf3"
                         android:layout_width="0dp"
-                        android:layout_height="36dp"
+                        android:layout_height="34dp"
                         android:layout_weight="1"
                         android:background="@android:color/transparent"
+                        android:clickable="true"
+                        android:focusable="true"
                         android:fontFeatureSettings="tnum"
-                        android:minWidth="0dp"
-                        android:stateListAnimator="@null"
+                        android:gravity="center"
+                        android:maxLines="1"
+                        android:paddingHorizontal="2dp"
                         android:text="P4"
-                        android:textAllCaps="false"
                         android:textColor="@color/text_secondary"
                         android:textSize="12sp" />
                 </LinearLayout>
@@ -206,6 +226,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:letterSpacing="0.06"
+                    android:maxLines="1"
                     android:text="@string/section_radar"
                     android:textAllCaps="true"
                     android:textColor="@color/text_secondary"
@@ -227,7 +248,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
-                    android:text="Schaltet bei herannahenden Fahrzeugen automatisch auf das gewählte Profil und danach zurück."
+                    android:text="Schaltet bei Fahrzeugen automatisch auf das Ziel-Profil und danach zurück."
                     android:textColor="@color/text_secondary"
                     android:textSize="11sp" />
 
@@ -248,59 +269,67 @@
                     android:orientation="horizontal"
                     android:padding="3dp">
 
-                    <Button
+                    <TextView
                         android:id="@+id/btnRadarProf0"
                         android:layout_width="0dp"
-                        android:layout_height="36dp"
+                        android:layout_height="34dp"
                         android:layout_weight="1"
                         android:background="@android:color/transparent"
+                        android:clickable="true"
+                        android:focusable="true"
                         android:fontFeatureSettings="tnum"
-                        android:minWidth="0dp"
-                        android:stateListAnimator="@null"
+                        android:gravity="center"
+                        android:maxLines="1"
+                        android:paddingHorizontal="2dp"
                         android:text="P1"
-                        android:textAllCaps="false"
                         android:textColor="@color/text_secondary"
                         android:textSize="12sp" />
 
-                    <Button
+                    <TextView
                         android:id="@+id/btnRadarProf1"
                         android:layout_width="0dp"
-                        android:layout_height="36dp"
+                        android:layout_height="34dp"
                         android:layout_weight="1"
                         android:background="@drawable/bg_segment_active"
+                        android:clickable="true"
+                        android:focusable="true"
                         android:fontFeatureSettings="tnum"
-                        android:minWidth="0dp"
-                        android:stateListAnimator="@null"
+                        android:gravity="center"
+                        android:maxLines="1"
+                        android:paddingHorizontal="2dp"
                         android:text="P2"
-                        android:textAllCaps="false"
                         android:textColor="@color/text_primary"
                         android:textSize="12sp" />
 
-                    <Button
+                    <TextView
                         android:id="@+id/btnRadarProf2"
                         android:layout_width="0dp"
-                        android:layout_height="36dp"
+                        android:layout_height="34dp"
                         android:layout_weight="1"
                         android:background="@android:color/transparent"
+                        android:clickable="true"
+                        android:focusable="true"
                         android:fontFeatureSettings="tnum"
-                        android:minWidth="0dp"
-                        android:stateListAnimator="@null"
+                        android:gravity="center"
+                        android:maxLines="1"
+                        android:paddingHorizontal="2dp"
                         android:text="P3"
-                        android:textAllCaps="false"
                         android:textColor="@color/text_secondary"
                         android:textSize="12sp" />
 
-                    <Button
+                    <TextView
                         android:id="@+id/btnRadarProf3"
                         android:layout_width="0dp"
-                        android:layout_height="36dp"
+                        android:layout_height="34dp"
                         android:layout_weight="1"
                         android:background="@android:color/transparent"
+                        android:clickable="true"
+                        android:focusable="true"
                         android:fontFeatureSettings="tnum"
-                        android:minWidth="0dp"
-                        android:stateListAnimator="@null"
+                        android:gravity="center"
+                        android:maxLines="1"
+                        android:paddingHorizontal="2dp"
                         android:text="P4"
-                        android:textAllCaps="false"
                         android:textColor="@color/text_secondary"
                         android:textSize="12sp" />
                 </LinearLayout>
@@ -322,59 +351,67 @@
                     android:orientation="horizontal"
                     android:padding="3dp">
 
-                    <Button
+                    <TextView
                         android:id="@+id/btnHold1"
                         android:layout_width="0dp"
-                        android:layout_height="34dp"
+                        android:layout_height="32dp"
                         android:layout_weight="1"
                         android:background="@android:color/transparent"
+                        android:clickable="true"
+                        android:focusable="true"
                         android:fontFeatureSettings="tnum"
-                        android:minWidth="0dp"
-                        android:stateListAnimator="@null"
+                        android:gravity="center"
+                        android:maxLines="1"
+                        android:paddingHorizontal="2dp"
                         android:text="1 s"
-                        android:textAllCaps="false"
                         android:textColor="@color/text_secondary"
                         android:textSize="12sp" />
 
-                    <Button
+                    <TextView
                         android:id="@+id/btnHold2"
                         android:layout_width="0dp"
-                        android:layout_height="34dp"
+                        android:layout_height="32dp"
                         android:layout_weight="1"
                         android:background="@android:color/transparent"
+                        android:clickable="true"
+                        android:focusable="true"
                         android:fontFeatureSettings="tnum"
-                        android:minWidth="0dp"
-                        android:stateListAnimator="@null"
+                        android:gravity="center"
+                        android:maxLines="1"
+                        android:paddingHorizontal="2dp"
                         android:text="2 s"
-                        android:textAllCaps="false"
                         android:textColor="@color/text_secondary"
                         android:textSize="12sp" />
 
-                    <Button
+                    <TextView
                         android:id="@+id/btnHold3"
                         android:layout_width="0dp"
-                        android:layout_height="34dp"
+                        android:layout_height="32dp"
                         android:layout_weight="1"
                         android:background="@drawable/bg_segment_active"
+                        android:clickable="true"
+                        android:focusable="true"
                         android:fontFeatureSettings="tnum"
-                        android:minWidth="0dp"
-                        android:stateListAnimator="@null"
+                        android:gravity="center"
+                        android:maxLines="1"
+                        android:paddingHorizontal="2dp"
                         android:text="3 s"
-                        android:textAllCaps="false"
                         android:textColor="@color/text_primary"
                         android:textSize="12sp" />
 
-                    <Button
+                    <TextView
                         android:id="@+id/btnHold5"
                         android:layout_width="0dp"
-                        android:layout_height="34dp"
+                        android:layout_height="32dp"
                         android:layout_weight="1"
                         android:background="@android:color/transparent"
+                        android:clickable="true"
+                        android:focusable="true"
                         android:fontFeatureSettings="tnum"
-                        android:minWidth="0dp"
-                        android:stateListAnimator="@null"
+                        android:gravity="center"
+                        android:maxLines="1"
+                        android:paddingHorizontal="2dp"
                         android:text="5 s"
-                        android:textAllCaps="false"
                         android:textColor="@color/text_secondary"
                         android:textSize="12sp" />
                 </LinearLayout>
@@ -414,6 +451,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:letterSpacing="0.06"
+                        android:maxLines="1"
                         android:text="LICHTSENSOR"
                         android:textAllCaps="true"
                         android:textColor="@color/text_secondary"
@@ -463,45 +501,51 @@
                     android:orientation="horizontal"
                     android:padding="3dp">
 
-                    <Button
+                    <TextView
                         android:id="@+id/btnLux50"
                         android:layout_width="0dp"
-                        android:layout_height="34dp"
+                        android:layout_height="32dp"
                         android:layout_weight="1"
                         android:background="@android:color/transparent"
+                        android:clickable="true"
+                        android:focusable="true"
                         android:fontFeatureSettings="tnum"
-                        android:minWidth="0dp"
-                        android:stateListAnimator="@null"
+                        android:gravity="center"
+                        android:maxLines="1"
+                        android:paddingHorizontal="2dp"
                         android:text="50 lx"
-                        android:textAllCaps="false"
                         android:textColor="@color/text_secondary"
                         android:textSize="12sp" />
 
-                    <Button
+                    <TextView
                         android:id="@+id/btnLux150"
                         android:layout_width="0dp"
-                        android:layout_height="34dp"
+                        android:layout_height="32dp"
                         android:layout_weight="1"
                         android:background="@drawable/bg_segment_active"
+                        android:clickable="true"
+                        android:focusable="true"
                         android:fontFeatureSettings="tnum"
-                        android:minWidth="0dp"
-                        android:stateListAnimator="@null"
+                        android:gravity="center"
+                        android:maxLines="1"
+                        android:paddingHorizontal="2dp"
                         android:text="150 lx"
-                        android:textAllCaps="false"
                         android:textColor="@color/text_primary"
                         android:textSize="12sp" />
 
-                    <Button
+                    <TextView
                         android:id="@+id/btnLux400"
                         android:layout_width="0dp"
-                        android:layout_height="34dp"
+                        android:layout_height="32dp"
                         android:layout_weight="1"
                         android:background="@android:color/transparent"
+                        android:clickable="true"
+                        android:focusable="true"
                         android:fontFeatureSettings="tnum"
-                        android:minWidth="0dp"
-                        android:stateListAnimator="@null"
+                        android:gravity="center"
+                        android:maxLines="1"
+                        android:paddingHorizontal="2dp"
                         android:text="400 lx"
-                        android:textAllCaps="false"
                         android:textColor="@color/text_secondary"
                         android:textSize="12sp" />
                 </LinearLayout>
@@ -523,59 +567,67 @@
                     android:orientation="horizontal"
                     android:padding="3dp">
 
-                    <Button
+                    <TextView
                         android:id="@+id/btnDarkProf0"
                         android:layout_width="0dp"
-                        android:layout_height="34dp"
+                        android:layout_height="32dp"
                         android:layout_weight="1"
                         android:background="@drawable/bg_segment_active"
+                        android:clickable="true"
+                        android:focusable="true"
                         android:fontFeatureSettings="tnum"
-                        android:minWidth="0dp"
-                        android:stateListAnimator="@null"
+                        android:gravity="center"
+                        android:maxLines="1"
+                        android:paddingHorizontal="2dp"
                         android:text="P1"
-                        android:textAllCaps="false"
                         android:textColor="@color/text_primary"
                         android:textSize="12sp" />
 
-                    <Button
+                    <TextView
                         android:id="@+id/btnDarkProf1"
                         android:layout_width="0dp"
-                        android:layout_height="34dp"
+                        android:layout_height="32dp"
                         android:layout_weight="1"
                         android:background="@android:color/transparent"
+                        android:clickable="true"
+                        android:focusable="true"
                         android:fontFeatureSettings="tnum"
-                        android:minWidth="0dp"
-                        android:stateListAnimator="@null"
+                        android:gravity="center"
+                        android:maxLines="1"
+                        android:paddingHorizontal="2dp"
                         android:text="P2"
-                        android:textAllCaps="false"
                         android:textColor="@color/text_secondary"
                         android:textSize="12sp" />
 
-                    <Button
+                    <TextView
                         android:id="@+id/btnDarkProf2"
                         android:layout_width="0dp"
-                        android:layout_height="34dp"
+                        android:layout_height="32dp"
                         android:layout_weight="1"
                         android:background="@android:color/transparent"
+                        android:clickable="true"
+                        android:focusable="true"
                         android:fontFeatureSettings="tnum"
-                        android:minWidth="0dp"
-                        android:stateListAnimator="@null"
+                        android:gravity="center"
+                        android:maxLines="1"
+                        android:paddingHorizontal="2dp"
                         android:text="P3"
-                        android:textAllCaps="false"
                         android:textColor="@color/text_secondary"
                         android:textSize="12sp" />
 
-                    <Button
+                    <TextView
                         android:id="@+id/btnDarkProf3"
                         android:layout_width="0dp"
-                        android:layout_height="34dp"
+                        android:layout_height="32dp"
                         android:layout_weight="1"
                         android:background="@android:color/transparent"
+                        android:clickable="true"
+                        android:focusable="true"
                         android:fontFeatureSettings="tnum"
-                        android:minWidth="0dp"
-                        android:stateListAnimator="@null"
+                        android:gravity="center"
+                        android:maxLines="1"
+                        android:paddingHorizontal="2dp"
                         android:text="P4"
-                        android:textAllCaps="false"
                         android:textColor="@color/text_secondary"
                         android:textSize="12sp" />
                 </LinearLayout>
@@ -597,72 +649,82 @@
                     android:orientation="horizontal"
                     android:padding="3dp">
 
-                    <Button
+                    <TextView
                         android:id="@+id/btnBrightOff"
                         android:layout_width="0dp"
-                        android:layout_height="34dp"
+                        android:layout_height="32dp"
                         android:layout_weight="1"
                         android:background="@drawable/bg_segment_active"
-                        android:minWidth="0dp"
-                        android:stateListAnimator="@null"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center"
+                        android:maxLines="1"
+                        android:paddingHorizontal="2dp"
                         android:text="Aus"
-                        android:textAllCaps="false"
                         android:textColor="@color/text_primary"
                         android:textSize="12sp" />
 
-                    <Button
+                    <TextView
                         android:id="@+id/btnBrightProf0"
                         android:layout_width="0dp"
-                        android:layout_height="34dp"
+                        android:layout_height="32dp"
                         android:layout_weight="1"
                         android:background="@android:color/transparent"
+                        android:clickable="true"
+                        android:focusable="true"
                         android:fontFeatureSettings="tnum"
-                        android:minWidth="0dp"
-                        android:stateListAnimator="@null"
+                        android:gravity="center"
+                        android:maxLines="1"
+                        android:paddingHorizontal="2dp"
                         android:text="P1"
-                        android:textAllCaps="false"
                         android:textColor="@color/text_secondary"
                         android:textSize="12sp" />
 
-                    <Button
+                    <TextView
                         android:id="@+id/btnBrightProf1"
                         android:layout_width="0dp"
-                        android:layout_height="34dp"
+                        android:layout_height="32dp"
                         android:layout_weight="1"
                         android:background="@android:color/transparent"
+                        android:clickable="true"
+                        android:focusable="true"
                         android:fontFeatureSettings="tnum"
-                        android:minWidth="0dp"
-                        android:stateListAnimator="@null"
+                        android:gravity="center"
+                        android:maxLines="1"
+                        android:paddingHorizontal="2dp"
                         android:text="P2"
-                        android:textAllCaps="false"
                         android:textColor="@color/text_secondary"
                         android:textSize="12sp" />
 
-                    <Button
+                    <TextView
                         android:id="@+id/btnBrightProf2"
                         android:layout_width="0dp"
-                        android:layout_height="34dp"
+                        android:layout_height="32dp"
                         android:layout_weight="1"
                         android:background="@android:color/transparent"
+                        android:clickable="true"
+                        android:focusable="true"
                         android:fontFeatureSettings="tnum"
-                        android:minWidth="0dp"
-                        android:stateListAnimator="@null"
+                        android:gravity="center"
+                        android:maxLines="1"
+                        android:paddingHorizontal="2dp"
                         android:text="P3"
-                        android:textAllCaps="false"
                         android:textColor="@color/text_secondary"
                         android:textSize="12sp" />
 
-                    <Button
+                    <TextView
                         android:id="@+id/btnBrightProf3"
                         android:layout_width="0dp"
-                        android:layout_height="34dp"
+                        android:layout_height="32dp"
                         android:layout_weight="1"
                         android:background="@android:color/transparent"
+                        android:clickable="true"
+                        android:focusable="true"
                         android:fontFeatureSettings="tnum"
-                        android:minWidth="0dp"
-                        android:stateListAnimator="@null"
+                        android:gravity="center"
+                        android:maxLines="1"
+                        android:paddingHorizontal="2dp"
                         android:text="P4"
-                        android:textAllCaps="false"
                         android:textColor="@color/text_secondary"
                         android:textSize="12sp" />
                 </LinearLayout>
@@ -681,6 +743,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:letterSpacing="0.06"
+                    android:maxLines="1"
                     android:text="@string/section_automation"
                     android:textAllCaps="true"
                     android:textColor="@color/text_secondary"
@@ -715,29 +778,33 @@
                     android:orientation="horizontal"
                     android:padding="3dp">
 
-                    <Button
+                    <TextView
                         android:id="@+id/btnPauseKeep"
                         android:layout_width="0dp"
                         android:layout_height="34dp"
                         android:layout_weight="1"
                         android:background="@drawable/bg_segment_active"
-                        android:minWidth="0dp"
-                        android:stateListAnimator="@null"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center"
+                        android:maxLines="1"
+                        android:paddingHorizontal="4dp"
                         android:text="An lassen"
-                        android:textAllCaps="false"
                         android:textColor="@color/text_primary"
                         android:textSize="12sp" />
 
-                    <Button
+                    <TextView
                         android:id="@+id/btnPauseOff"
                         android:layout_width="0dp"
                         android:layout_height="34dp"
                         android:layout_weight="1"
                         android:background="@android:color/transparent"
-                        android:minWidth="0dp"
-                        android:stateListAnimator="@null"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center"
+                        android:maxLines="1"
+                        android:paddingHorizontal="4dp"
                         android:text="Ausschalten"
-                        android:textAllCaps="false"
                         android:textColor="@color/text_secondary"
                         android:textSize="12sp" />
                 </LinearLayout>
@@ -770,17 +837,17 @@
             android:textColor="@color/text_primary"
             android:textSize="12sp" />
 
-        <Button
+        <TextView
             android:id="@+id/btnToastUndo"
             android:layout_width="wrap_content"
             android:layout_height="28dp"
             android:layout_marginStart="8dp"
             android:background="@drawable/bg_btn_secondary"
-            android:minWidth="0dp"
-            android:paddingHorizontal="8dp"
-            android:stateListAnimator="@null"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:paddingHorizontal="10dp"
             android:text="@string/action_undo"
-            android:textAllCaps="false"
             android:textColor="@color/accent_primary"
             android:textSize="11sp"
             android:textStyle="bold"

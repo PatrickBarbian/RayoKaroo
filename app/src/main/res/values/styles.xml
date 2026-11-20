@@ -4,6 +4,8 @@
         <item name="colorPrimary">@color/accent_primary</item>
         <item name="colorPrimaryVariant">@color/accent_primary_pressed</item>
         <item name="colorOnPrimary">@color/accent_on_primary</item>
+        <item name="colorSecondary">@color/accent_primary</item>
+        <item name="colorControlActivated">@color/accent_primary</item>
         <item name="android:windowBackground">@color/surface_canvas</item>
         <item name="android:statusBarColor">@color/surface_canvas</item>
         <item name="android:navigationBarColor">@color/surface_canvas</item>
