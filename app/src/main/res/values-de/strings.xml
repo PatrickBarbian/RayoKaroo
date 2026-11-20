@@ -16,7 +16,7 @@
     <string name="datatype_ant_battery_desc">Echtzeit-Akkustand des Lezyne Radar / ANT+ Lichts in %</string>
 
     <!-- Section Titles -->
-    <string name="settings_title">Licht- &amp; Radar-Cockpit</string>
+    <string name="settings_title">Rayo Cockpit</string>
     <string name="section_rayo">Hauteworks Rayo (Bluetooth)</string>
     <string name="section_ant">Lezyne Radar / ANT+ Lichter</string>
     <string name="section_radar">Radar-Reaktion</string>
